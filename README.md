@@ -34,3 +34,18 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Docker
+
+This project includes a production Docker setup using Next.js standalone output and PostgreSQL.
+
+1. Copy `.env.example` to `.env` and fill in the secrets.
+2. Start the stack:
+
+```bash
+docker compose up --build
+```
+
+3. Open [http://localhost:3000](http://localhost:3000).
+
+The app container expects `DATABASE_URL`, `NEXTAUTH_URL`, and `NEXTAUTH_SECRET`.
