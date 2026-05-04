@@ -49,3 +49,21 @@ docker compose up --build
 3. Open [http://localhost:3000](http://localhost:3000).
 
 The app container expects `DATABASE_URL`, `NEXTAUTH_URL`, and `NEXTAUTH_SECRET`.
+
+## Discord Bot
+
+The project also includes a Discord bot based on `discord.js`.
+
+Run it with:
+
+```bash
+npm run bot
+```
+
+Required environment variables:
+
+- `DISCORD_BOT_TOKEN`
+- `DISCORD_CLIENT_ID`
+- `DISCORD_NOTIFICATION_CHANNEL_ID`
+- `DISCORD_GUILD_ID` (optional, to register commands in a guild immediately)
+- `DISCORD_STAFF_ROLE_ID` (optional, to authorize delivery commands)
