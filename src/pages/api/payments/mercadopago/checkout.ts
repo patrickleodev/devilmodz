@@ -6,6 +6,8 @@ import { Order } from "../../../../entities/Order";
 import { Payment } from "../../../../entities/Payment";
 import { createMercadoPagoPreference, getAppBaseUrl, getMercadoPagoCheckoutMode, getMercadoPagoCheckoutUrl } from "../../../../lib/mercadopago";
 import { ensureDataSource } from "../../../../lib/db";
+import { sendDiscordChannelMessage, buildOrderCreatedMessage } from "../../../../lib/discord";
+import { User } from "../../../../entities/User";
 
 type CheckoutBody = {
   productId?: string;
@@ -101,6 +103,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         rawPayload: preference,
       })
     );
+
+      // notify Discord channel about created order (mention user if discordId available)
+      try {
+        const userRepo = dataSource.getRepository(User);
+        const dbUser = await userRepo.findOneBy({ id: sessionUser.id });
+        const mention = dbUser?.discordId ? `<@${dbUser.discordId}>` : null;
+        await sendDiscordChannelMessage(buildOrderCreatedMessage({ orderId: savedOrder.id, productTitle: product.title, amount, mention, userEmail: session?.user?.email || null }));
+      } catch (notifyErr) {
+        // ignore notification failures
+        // eslint-disable-next-line no-console
+        console.warn("Discord notify failed:", notifyErr);
+      }
 
     return res.status(200).json({
       orderId: savedOrder.id,

@@ -51,6 +51,27 @@ export const buildOrderPaidMessage = (input: {
     .join("\n");
 };
 
+export const buildOrderCreatedMessage = (input: {
+  orderId: string;
+  productTitle: string;
+  amount: number;
+  mention?: string | null;
+  userEmail?: string | null;
+}) => {
+  const customerLabel = input.userEmail ? `\nCliente: ${input.userEmail}` : "";
+  const mentionLabel = input.mention ? `${input.mention} ` : "";
+
+  return [
+    `${mentionLabel}Novo pedido criado.`,
+    `Pedido: ${input.orderId}`,
+    `Produto: ${input.productTitle}`,
+    `Valor: R$ ${input.amount}`,
+    customerLabel,
+  ]
+    .filter(Boolean)
+    .join("\n");
+};
+
 export const buildDeliveryMessage = (input: {
   orderId: string;
   productTitle: string;

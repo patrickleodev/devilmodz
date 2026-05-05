@@ -1,0 +1,70 @@
+import type { NextApiRequest, NextApiResponse } from "next";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "../../../lib/auth";
+import { ensureDataSource } from "../../../lib/db";
+import { CartItem } from "../../../entities/CartItem";
+import { Product } from "../../../entities/Product";
+
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  const session = await getServerSession(req, res, authOptions);
+  const sessionUser = session?.user as { id?: string } | undefined;
+
+  if (!sessionUser?.id) return res.status(401).json({ error: "Unauthorized" });
+
+  const dataSource = await ensureDataSource();
+  const cartRepo = dataSource.getRepository(CartItem);
+  const productRepo = dataSource.getRepository(Product);
+
+  try {
+    if (req.method === "GET") {
+      const items = await cartRepo.find({ where: { userId: sessionUser.id } });
+      const detailed = await Promise.all(
+        items.map(async (it) => {
+          const product = await productRepo.findOneBy({ id: it.productId });
+          return { ...it, product };
+        })
+      );
+      return res.status(200).json({ items: detailed });
+    }
+
+    if (req.method === "POST") {
+      const { productId, quantity } = req.body as { productId?: string; quantity?: number };
+      if (!productId) return res.status(400).json({ error: "productId required" });
+      const qty = Math.max(1, Number(quantity || 1));
+
+      const existing = await cartRepo.findOneBy({ userId: sessionUser.id, productId });
+      if (existing) {
+        existing.quantity = qty;
+        await cartRepo.save(existing);
+      } else {
+        const created = cartRepo.create({ userId: sessionUser.id, productId, quantity: qty });
+        await cartRepo.save(created);
+      }
+
+      const items = await cartRepo.find({ where: { userId: sessionUser.id } });
+      const detailed = await Promise.all(
+        items.map(async (it) => ({ ...it, product: await productRepo.findOneBy({ id: it.productId }) }))
+      );
+      return res.status(200).json({ items: detailed });
+    }
+
+    if (req.method === "DELETE") {
+      const { itemId, productId } = req.body as { itemId?: string; productId?: string };
+      if (!itemId && !productId) return res.status(400).json({ error: "itemId or productId required" });
+
+      if (itemId) {
+        await cartRepo.delete({ id: itemId, userId: sessionUser.id } as any);
+      } else if (productId) {
+        await cartRepo.delete({ userId: sessionUser.id, productId } as any);
+      }
+
+      return res.status(200).json({ ok: true });
+    }
+
+    res.setHeader("Allow", ["GET", "POST", "DELETE"]);
+    return res.status(405).json({ error: "Method not allowed" });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unexpected error";
+    return res.status(500).json({ error: message });
+  }
+}
