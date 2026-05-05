@@ -97,7 +97,6 @@ export const createMercadoPagoPreference = async (input: CreatePreferenceInput) 
         pending: `${getAppBaseUrl()}/?payment=pending`,
         failure: `${getAppBaseUrl()}/?payment=failure`,
       },
-      auto_return: "approved",
       payer: input.payerEmail ? { email: input.payerEmail } : undefined,
       metadata: input.metadata,
     }),
