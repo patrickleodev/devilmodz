@@ -74,6 +74,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         productId: product.id,
         userId: sessionUser.id,
       },
+      payerEmail: session?.user?.email || undefined,
       items: [
         {
           id: product.id,

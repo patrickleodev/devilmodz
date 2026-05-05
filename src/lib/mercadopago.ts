@@ -10,6 +10,7 @@ type CreatePreferenceInput = {
   externalReference: string;
   notificationUrl: string;
   items: MercadoPagoItem[];
+  payerEmail?: string;
   metadata?: Record<string, unknown>;
 };
 
@@ -91,6 +92,13 @@ export const createMercadoPagoPreference = async (input: CreatePreferenceInput) 
       items: input.items,
       external_reference: input.externalReference,
       notification_url: input.notificationUrl,
+      back_urls: {
+        success: `${getAppBaseUrl()}/?payment=success`,
+        pending: `${getAppBaseUrl()}/?payment=pending`,
+        failure: `${getAppBaseUrl()}/?payment=failure`,
+      },
+      auto_return: "approved",
+      payer: input.payerEmail ? { email: input.payerEmail } : undefined,
       metadata: input.metadata,
     }),
   });
