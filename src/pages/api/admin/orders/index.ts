@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getServerSession } from "next-auth/next";
-import { authOptions } from "../../auth/[...nextauth]";
+import { authOptions } from "../../../../lib/auth";
 import { Order } from "../../../../entities/Order";
 import { ensureDataSource } from "../../../../lib/db";
 import { isAdminRole } from "../../../../lib/admin";

@@ -1,7 +1,6 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, OneToMany } from "typeorm";
-import { Order } from "./Order";
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn } from "typeorm";
 
-@Entity({ name: "users" })
+@Entity("users")
 export class User {
   @PrimaryGeneratedColumn("uuid")
   id!: string;
@@ -23,9 +22,6 @@ export class User {
 
   @CreateDateColumn()
   createdAt!: Date;
-
-  @OneToMany(() => Order, (order) => order.user)
-  orders!: Order[];
 }
 
 export default User;

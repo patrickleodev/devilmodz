@@ -1,14 +1,9 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn } from "typeorm";
-import { Order } from "./Order";
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn } from "typeorm";
 
-@Entity({ name: "payments" })
+@Entity("payments")
 export class Payment {
   @PrimaryGeneratedColumn("uuid")
   id!: string;
-
-  @ManyToOne(() => Order, (order) => order.payments, { nullable: false })
-  @JoinColumn({ name: "orderId" })
-  order!: Order;
 
   @Column()
   orderId!: string;

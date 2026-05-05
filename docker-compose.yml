@@ -18,14 +18,21 @@ services:
     restart: unless-stopped
     depends_on:
       - db
+    env_file:
+      - .env
     environment:
       NODE_ENV: production
       PORT: 3000
-      DATABASE_URL: postgresql://postgres:postgres@db:5432/devilmodz
-      NEXTAUTH_URL: http://localhost:3000
-      NEXTAUTH_SECRET: change-me-in-production
-      DISCORD_CLIENT_ID: change-me
-      DISCORD_CLIENT_SECRET: change-me
+      DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@db:5432/devilmodz}
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-change-me-in-production}
+      DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID}
+      DISCORD_CLIENT_SECRET: ${DISCORD_CLIENT_SECRET}
+      DISCORD_PUBLIC_KEY: ${DISCORD_PUBLIC_KEY}
+      DISCORD_BOT_TOKEN: ${DISCORD_BOT_TOKEN}
+      DISCORD_NOTIFICATION_CHANNEL_ID: ${DISCORD_NOTIFICATION_CHANNEL_ID}
+      MERCADO_PAGO_ACCESS_TOKEN: ${MERCADO_PAGO_ACCESS_TOKEN}
+      APP_URL: ${APP_URL:-http://localhost:3000}
     ports:
       - "3000:3000"
 

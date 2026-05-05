@@ -92,7 +92,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       await sendDiscordChannelMessage(
         buildOrderPaidMessage({
           orderId: order.id,
-          productTitle: order.product?.title || order.productId,
+          productTitle: order.productId,
           amount: order.amount,
         })
       );

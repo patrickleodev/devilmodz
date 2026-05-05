@@ -35,6 +35,33 @@ The easiest way to deploy your Next.js app is to use the [Vercel Platform](https
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
 
+### Vercel checklist
+
+1. Create or import the repository in Vercel.
+2. Set the project framework to Next.js if Vercel does not detect it automatically.
+3. Add the production environment variables:
+	- `DATABASE_URL`
+	- `NEXTAUTH_URL`
+	- `NEXTAUTH_SECRET`
+	- `DISCORD_CLIENT_ID`
+	- `DISCORD_CLIENT_SECRET`
+	- `APP_URL`
+	- `MERCADO_PAGO_ACCESS_TOKEN`
+	- `DISCORD_BOT_TOKEN`
+	- `DISCORD_NOTIFICATION_CHANNEL_ID`
+4. Keep `DISCORD_GUILD_ID` and `DISCORD_STAFF_ROLE_ID` only if you want to use guild-scoped commands and staff restriction.
+5. Set the production `APP_URL` to the public domain of the Vercel deployment.
+6. Configure the Mercado Pago webhook to point to `/api/payments/mercadopago/webhook` on the production domain.
+7. Trigger a deploy and confirm the build passes.
+
+### Environment validation
+
+Run this before deploying:
+
+```bash
+npm run verify-env
+```
+
 ## Docker
 
 This project includes a production Docker setup using Next.js standalone output and PostgreSQL.

@@ -8,10 +8,13 @@
     "start": "next start",
     "lint": "eslint",
     "docker": "docker compose up --build",
-    "bot": "tsx src/bot/index.ts"
+    "bot": "tsx src/bot/index.ts",
+    "verify-env": "node scripts/validate-env.mjs"
   },
   "dependencies": {
     "@discordjs/rest": "^2.4.0",
+    "@supabase/ssr": "^0.10.2",
+    "@supabase/supabase-js": "^2.105.3",
     "bcrypt": "^6.0.0",
     "bcryptjs": "^2.4.3",
     "discord-api-types": "^0.38.32",
@@ -32,8 +35,8 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.4",
-    "tsx": "^4.20.5",
     "tailwindcss": "^4",
+    "tsx": "^4.20.5",
     "typescript": "^5"
   }
 }

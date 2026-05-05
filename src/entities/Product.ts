@@ -1,7 +1,6 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, OneToMany } from "typeorm";
-import { Order } from "./Order";
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn } from "typeorm";
 
-@Entity({ name: "products" })
+@Entity("products")
 export class Product {
   @PrimaryGeneratedColumn("uuid")
   id!: string;
@@ -26,9 +25,6 @@ export class Product {
 
   @CreateDateColumn()
   createdAt!: Date;
-
-  @OneToMany(() => Order, (order) => order.product)
-  orders!: Order[];
 }
 
 export default Product;
