@@ -56,36 +56,38 @@ export default function CartPage() {
   };
 
   return (
-    <main className="mx-auto max-w-4xl p-6">
-      <h1 className="text-2xl font-bold mb-4">Carrinho</h1>
-      {!session ? (
-        <div>
-          <p>Faça login com Discord para acessar seu carrinho.</p>
-          <button onClick={() => signIn("discord", { callbackUrl: "/cart" })} className="mt-3 rounded bg-cyan-400 px-4 py-2">Entrar</button>
-        </div>
-      ) : null}
-
-      {error ? <div className="mt-4 text-red-500">{error}</div> : null}
-
-      <div className="mt-6 space-y-4">
-        {loading ? <div>Carregando...</div> : null}
-        {items.length === 0 && !loading ? <div>Seu carrinho está vazio.</div> : null}
-        {items.map((it) => (
-          <div key={it.id} className="flex items-center justify-between rounded border p-4">
-            <div>
-              <div className="font-medium">{it.product?.title || it.productId}</div>
-              <div className="text-sm text-slate-400">Quantidade: {it.quantity}</div>
-            </div>
-            <div className="flex items-center gap-2">
-              <button onClick={() => handleRemove(it.id)} className="rounded bg-rose-500 px-3 py-1 text-white">Remover</button>
-            </div>
+    <main className="mx-auto w-full max-w-4xl px-4 py-6 sm:px-6 lg:px-8">
+      <div className="rounded-[28px] border border-white/10 bg-white/5 p-5 shadow-2xl shadow-black/20 backdrop-blur sm:p-6">
+        <h1 className="mb-4 text-2xl font-bold">Carrinho</h1>
+        {!session ? (
+          <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-4">
+            <p>Faça login com Discord para acessar seu carrinho.</p>
+            <button onClick={() => signIn("discord", { callbackUrl: "/cart" })} className="mt-3 w-full rounded-2xl bg-cyan-400 px-4 py-3 font-semibold text-slate-950 sm:w-auto">Entrar</button>
           </div>
-        ))}
-      </div>
+        ) : null}
 
-      <div className="mt-6 flex gap-3">
-        <button onClick={handleCheckout} className="rounded bg-emerald-400 px-4 py-2 font-semibold">Finalizar compra</button>
-        <button onClick={fetchCart} className="rounded border px-4 py-2">Atualizar</button>
+        {error ? <div className="mt-4 text-red-500">{error}</div> : null}
+
+        <div className="mt-6 space-y-4">
+          {loading ? <div>Carregando...</div> : null}
+          {items.length === 0 && !loading ? <div>Seu carrinho está vazio.</div> : null}
+          {items.map((it) => (
+            <div key={it.id} className="flex flex-col gap-4 rounded-2xl border border-white/10 bg-white/5 p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
+                <div className="break-words font-medium">{it.product?.title || it.productId}</div>
+                <div className="text-sm text-slate-400">Quantidade: {it.quantity}</div>
+              </div>
+              <div className="flex items-center gap-2 sm:justify-end">
+                <button onClick={() => handleRemove(it.id)} className="w-full rounded-2xl bg-rose-500 px-3 py-2 text-white sm:w-auto">Remover</button>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+          <button onClick={handleCheckout} className="w-full rounded-2xl bg-emerald-400 px-4 py-3 font-semibold text-slate-950 sm:w-auto">Finalizar compra</button>
+          <button onClick={fetchCart} className="w-full rounded-2xl border border-white/10 px-4 py-3 sm:w-auto">Atualizar</button>
+        </div>
       </div>
     </main>
   );

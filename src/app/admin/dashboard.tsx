@@ -145,7 +145,7 @@ export default function AdminDashboard() {
   };
 
   return (
-    <main className="min-h-screen px-6 py-10 text-white lg:px-10">
+    <main className="min-h-screen px-4 py-6 text-white sm:px-6 lg:px-10 lg:py-10">
       <div className="mx-auto flex max-w-7xl flex-col gap-8">
         <header className="rounded-[28px] border border-white/10 bg-white/5 p-6 backdrop-blur">
           <p className="text-xs uppercase tracking-[0.32em] text-slate-500">Painel admin</p>
@@ -161,7 +161,7 @@ export default function AdminDashboard() {
           </div>
         ) : null}
 
-        <section className="grid gap-4 md:grid-cols-4">
+        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {[
             ["Produtos", String(summary.products)],
             ["Pedidos", String(summary.orders)],
@@ -177,7 +177,7 @@ export default function AdminDashboard() {
 
         <section className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
           <div className="rounded-[28px] border border-white/10 bg-slate-950/70 p-6">
-            <div className="flex items-center justify-between gap-4">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-xs uppercase tracking-[0.28em] text-slate-500">Catálogo</p>
                 <h2 className="mt-2 text-2xl font-semibold">Criar produto</h2>
@@ -230,7 +230,7 @@ export default function AdminDashboard() {
             <button
               onClick={createProduct}
               disabled={actionState === "create-product"}
-              className="mt-6 inline-flex rounded-2xl bg-gradient-to-r from-cyan-400 to-emerald-400 px-5 py-3 font-semibold text-slate-950 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+              className="mt-6 inline-flex w-full justify-center rounded-2xl bg-gradient-to-r from-cyan-400 to-emerald-400 px-5 py-3 font-semibold text-slate-950 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
             >
               {actionState === "create-product" ? "Criando..." : "Salvar produto"}
             </button>
@@ -277,7 +277,7 @@ export default function AdminDashboard() {
               ) : (
                 orders.map((order) => (
                   <article key={order.id} className="rounded-3xl border border-white/10 bg-white/5 p-5">
-                    <div className="flex items-start justify-between gap-4">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                       <div>
                         <h3 className="text-lg font-semibold text-white">Pedido {order.id.slice(0, 8)}</h3>
                         <p className="mt-2 text-sm text-slate-400">
@@ -294,7 +294,7 @@ export default function AdminDashboard() {
                       <span className="rounded-full bg-white/5 px-3 py-1">{new Date(order.createdAt).toLocaleString("pt-BR")}</span>
                     </div>
 
-                    <div className="mt-5 flex flex-wrap gap-3">
+                    <div className="mt-5 flex flex-col gap-3 sm:flex-row">
                       <button
                         onClick={() => updateOrder(order.id, { action: "deliver" })}
                         disabled={actionState === order.id}

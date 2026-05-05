@@ -97,7 +97,7 @@ export default function Home() {
 
   return (
     <main className="flex min-h-screen flex-col">
-      <section className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-16 px-6 py-10 lg:px-10">
+      <section className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-12 px-4 py-6 sm:px-6 sm:py-10 lg:px-10">
         <div className="flex flex-col gap-8 rounded-[32px] border border-white/10 bg-white/5 p-8 shadow-2xl shadow-black/30 backdrop-blur md:p-12">
           <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-3xl space-y-5">
@@ -113,7 +113,7 @@ export default function Home() {
               </p>
             </div>
 
-            <div className="rounded-3xl border border-white/10 bg-slate-950/70 p-5 text-sm text-slate-300 shadow-lg shadow-black/20">
+            <div className="w-full rounded-3xl border border-white/10 bg-slate-950/70 p-5 text-sm text-slate-300 shadow-lg shadow-black/20 lg:max-w-sm">
               <p className="text-xs uppercase tracking-[0.28em] text-slate-500">Status da conta</p>
               <p className="mt-2 text-lg font-medium text-white">{sessionLabel}</p>
               <p className="mt-2 max-w-xs text-sm leading-6 text-slate-400">
@@ -172,7 +172,7 @@ export default function Home() {
                     <button
                       disabled={pendingId === product.id}
                       onClick={() => handleCheckout(product.id)}
-                      className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-cyan-400 to-emerald-400 px-5 py-3 font-semibold text-slate-950 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+                      className="inline-flex w-full items-center justify-center rounded-2xl bg-gradient-to-r from-cyan-400 to-emerald-400 px-5 py-3 font-semibold text-slate-950 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
                     >
                       {pendingId === product.id ? "Abrindo checkout..." : isAuthenticated ? "Comprar agora" : "Entrar e comprar"}
                     </button>
