@@ -22,6 +22,8 @@ type MercadoPagoPaymentResponse = {
   date_approved?: string | null;
 };
 
+type MercadoPagoCheckoutMode = "sandbox" | "production";
+
 const getAccessToken = () => {
   const accessToken = process.env.MERCADO_PAGO_ACCESS_TOKEN;
 
@@ -34,6 +36,29 @@ const getAccessToken = () => {
 
 export const getAppBaseUrl = () => {
   return process.env.APP_URL || process.env.NEXTAUTH_URL || "http://localhost:3000";
+};
+
+export const getMercadoPagoCheckoutMode = (): MercadoPagoCheckoutMode => {
+  const configuredMode = process.env.MERCADO_PAGO_MODE?.toLowerCase();
+
+  if (configuredMode === "sandbox" || configuredMode === "production") {
+    return configuredMode;
+  }
+
+  return process.env.NODE_ENV === "production" ? "production" : "sandbox";
+};
+
+export const getMercadoPagoCheckoutUrl = (preference: {
+  init_point: string;
+  sandbox_init_point?: string;
+}) => {
+  const mode = getMercadoPagoCheckoutMode();
+
+  if (mode === "sandbox") {
+    return preference.sandbox_init_point || preference.init_point;
+  }
+
+  return preference.init_point;
 };
 
 const mercadoPagoRequest = async <T>(path: string, init?: RequestInit): Promise<T> => {

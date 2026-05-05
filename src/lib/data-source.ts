@@ -11,7 +11,7 @@ const databaseUrl = process.env.DATABASE_URL || "postgres://postgres:password@lo
 export const AppDataSource = new DataSource({
   type: "postgres",
   url: databaseUrl,
-  synchronize: false,
+  synchronize: process.env.TYPEORM_SYNCHRONIZE === "true" || process.env.NODE_ENV !== "production",
   logging: false,
   entities: [User, Product, Order, Payment, DeliveryLog],
   migrations: [],

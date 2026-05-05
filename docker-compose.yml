@@ -23,6 +23,8 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3000
+      MERCADO_PAGO_MODE: ${MERCADO_PAGO_MODE:-production}
+      TYPEORM_SYNCHRONIZE: "true"
       DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@db:5432/devilmodz}
       NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-change-me-in-production}

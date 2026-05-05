@@ -73,6 +73,7 @@ export default function Home() {
 
       const payload = (await response.json()) as {
         error?: string;
+        paymentUrl?: string;
         initPoint?: string;
         sandboxInitPoint?: string;
       };
@@ -81,7 +82,7 @@ export default function Home() {
         throw new Error(payload.error || "Falha ao iniciar checkout");
       }
 
-      const redirectUrl = payload.initPoint || payload.sandboxInitPoint;
+      const redirectUrl = payload.paymentUrl || payload.initPoint || payload.sandboxInitPoint;
 
       if (!redirectUrl) {
         throw new Error("Mercado Pago não retornou a URL de pagamento");

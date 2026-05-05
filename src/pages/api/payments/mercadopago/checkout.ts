@@ -4,13 +4,21 @@ import { authOptions } from "../../../../lib/auth";
 import { Product } from "../../../../entities/Product";
 import { Order } from "../../../../entities/Order";
 import { Payment } from "../../../../entities/Payment";
-import { createMercadoPagoPreference, getAppBaseUrl } from "../../../../lib/mercadopago";
+import { createMercadoPagoPreference, getAppBaseUrl, getMercadoPagoCheckoutMode, getMercadoPagoCheckoutUrl } from "../../../../lib/mercadopago";
 import { ensureDataSource } from "../../../../lib/db";
 
 type CheckoutBody = {
   productId?: string;
   quantity?: number;
 };
+
+const PRODUCT_ALIASES: Record<string, string> = {
+  starter: "Pacote Starter",
+  pro: "Pacote Pro",
+  elite: "Pacote Elite",
+};
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") {
@@ -39,7 +47,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const orderRepository = dataSource.getRepository(Order);
     const paymentRepository = dataSource.getRepository(Payment);
 
-    const product = await productRepository.findOneBy({ id: productId });
+    const product = UUID_PATTERN.test(productId)
+      ? await productRepository.findOneBy({ id: productId })
+      : await productRepository.findOneBy({ title: PRODUCT_ALIASES[productId] || productId });
 
     if (!product) {
       return res.status(404).json({ error: "Product not found" });
@@ -78,6 +88,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     savedOrder.mpPreferenceId = preference.id;
     await orderRepository.save(savedOrder);
 
+    const paymentUrl = getMercadoPagoCheckoutUrl(preference);
+    const checkoutMode = getMercadoPagoCheckoutMode();
+
     await paymentRepository.save(
       paymentRepository.create({
         orderId: savedOrder.id,
@@ -91,6 +104,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(200).json({
       orderId: savedOrder.id,
       preferenceId: preference.id,
+      paymentUrl,
+      checkoutMode,
       initPoint: preference.init_point,
       sandboxInitPoint: preference.sandbox_init_point,
     });
