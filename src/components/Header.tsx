@@ -2,16 +2,43 @@
 
 import { useSession, signIn, signOut } from "next-auth/react";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export default function Header() {
   const { data: session } = useSession();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const profileMenuRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const handlePointerDown = (event: MouseEvent) => {
+      if (
+        profileMenuRef.current &&
+        !profileMenuRef.current.contains(event.target as Node)
+      ) {
+        setProfileMenuOpen(false);
+      }
+    };
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setProfileMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleEscape);
+
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, []);
 
   return (
     <>
       <header className="w-full border-b border-white/10 bg-slate-950/80 backdrop-blur sticky top-0 z-50">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-10">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-2 sm:px-6 lg:px-10">
           {/* Logo */}
           <Link
             href="/"
@@ -27,6 +54,13 @@ export default function Header() {
 
           {/* Desktop Navigation */}
           <div className="hidden items-center gap-6 md:flex">
+            <Link
+              href="/planos"
+              className="rounded-lg px-3 py-2 text-sm font-medium text-slate-300 transition hover:bg-white/5 hover:text-white"
+            >
+              Planos
+            </Link>
+
             <Link
               href="/cart"
               className="relative flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-slate-300 hover:text-white hover:bg-white/5 transition"
@@ -49,25 +83,77 @@ export default function Header() {
 
             {/* User Menu */}
             {session?.user ? (
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2">
-                  {session.user.image && (
+              <div className="relative" ref={profileMenuRef}>
+                <button
+                  type="button"
+                  onClick={() => setProfileMenuOpen((current) => !current)}
+                  className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-white/5 transition hover:border-cyan-400/40 hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-cyan-400/40"
+                  aria-label="Abrir menu do perfil"
+                  aria-expanded={profileMenuOpen}
+                >
+                  {session.user.image ? (
                     <img
                       src={session.user.image}
-                      alt={session.user.name || "User"}
-                      className="h-8 w-8 rounded-full"
+                      alt={session.user.name || "Perfil"}
+                      className="h-full w-full object-cover"
                     />
+                  ) : (
+                    <span className="text-sm font-semibold text-white">
+                      {(session.user.name || "D").slice(0, 1).toUpperCase()}
+                    </span>
                   )}
-                  <span className="text-sm font-medium text-white">
-                    {session.user.name}
-                  </span>
-                </div>
-                <button
-                  onClick={() => signOut()}
-                  className="rounded-lg bg-red-500/10 px-3 py-2 text-sm font-medium text-red-200 hover:bg-red-500/20 transition"
-                >
-                  Sair
                 </button>
+
+                {profileMenuOpen ? (
+                  <div className="absolute right-0 top-full z-50 mt-2 w-56 rounded-3xl border border-white/10 bg-slate-950/95 p-1.5 shadow-2xl shadow-black/40 backdrop-blur">
+                    <div className="rounded-2xl border border-white/5 bg-white/5 px-3 py-2">
+                      <p className="text-xs uppercase tracking-[0.24em] text-slate-500">
+                        Conectado como
+                      </p>
+                      <p className="mt-1 text-sm font-medium text-white">
+                        {session.user.name || "Usuário"}
+                      </p>
+                    </div>
+
+                    <div className="mt-1.5 flex flex-col gap-1">
+                      <Link
+                        href="/account"
+                        onClick={() => setProfileMenuOpen(false)}
+                        className="flex items-center gap-2.5 rounded-2xl px-3 py-2 text-sm font-medium text-slate-200 transition hover:bg-white/5 hover:text-white"
+                      >
+                        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-cyan-400/10 text-cyan-200">
+                          ⚙
+                        </span>
+                        Gerenciar conta
+                      </Link>
+
+                      <Link
+                        href="/cart"
+                        onClick={() => setProfileMenuOpen(false)}
+                        className="flex items-center gap-2.5 rounded-2xl px-3 py-2 text-sm font-medium text-slate-200 transition hover:bg-white/5 hover:text-white"
+                      >
+                        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-400/10 text-emerald-200">
+                          🛒
+                        </span>
+                        Carrinho
+                      </Link>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setProfileMenuOpen(false);
+                          signOut();
+                        }}
+                        className="flex w-full items-center gap-2.5 rounded-2xl px-3 py-2 text-sm font-medium text-rose-200 transition hover:bg-rose-500/10 hover:text-rose-100"
+                      >
+                        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-rose-500/10 text-rose-200">
+                          ⎋
+                        </span>
+                        Sair
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
               </div>
             ) : (
               <button
@@ -114,6 +200,15 @@ export default function Header() {
           <div className="border-t border-white/10 bg-slate-900 md:hidden">
             <div className="flex flex-col gap-3 px-4 py-4">
               <Link
+                href="/planos"
+                className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-slate-300 hover:text-white hover:bg-white/5 transition"
+                onClick={() => setMenuOpen(false)}
+              >
+                <span className="text-base">📋</span>
+                <span>Planos</span>
+              </Link>
+
+              <Link
                 href="/cart"
                 className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-slate-300 hover:text-white hover:bg-white/5 transition"
                 onClick={() => setMenuOpen(false)}
@@ -144,6 +239,14 @@ export default function Header() {
                       {session.user.name}
                     </p>
                   </div>
+                  <Link
+                    href="/account"
+                    onClick={() => setMenuOpen(false)}
+                    className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-slate-300 hover:text-white hover:bg-white/5 transition"
+                  >
+                    <span className="text-base">⚙</span>
+                    <span>Gerenciar conta</span>
+                  </Link>
                   <button
                     onClick={() => {
                       signOut();

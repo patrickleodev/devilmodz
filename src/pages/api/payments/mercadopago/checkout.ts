@@ -48,6 +48,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const productRepository = dataSource.getRepository(Product);
     const orderRepository = dataSource.getRepository(Order);
     const paymentRepository = dataSource.getRepository(Payment);
+    const userRepository = dataSource.getRepository(User);
+
+    // Look up user by Discord ID to get their UUID
+    const dbUser = await userRepository.findOneBy({ discordId: sessionUser.id });
+    if (!dbUser) {
+      return res.status(404).json({ error: "User not found" });
+    }
 
     const product = UUID_PATTERN.test(productId)
       ? await productRepository.findOneBy({ id: productId })
@@ -59,7 +66,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const amount = product.price * quantity;
     const order = orderRepository.create({
-      userId: sessionUser.id,
+      userId: dbUser.id,
       productId: product.id,
       amount,
       status: "pending",
@@ -74,7 +81,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       metadata: {
         orderId: savedOrder.id,
         productId: product.id,
-        userId: sessionUser.id,
+        userId: dbUser.id,
       },
       payerEmail: session?.user?.email || undefined,
       items: [
@@ -106,9 +113,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       // notify Discord channel about created order (mention user if discordId available)
       try {
-        const userRepo = dataSource.getRepository(User);
-        const dbUser = await userRepo.findOneBy({ id: sessionUser.id });
-        const mention = dbUser?.discordId ? `<@${dbUser.discordId}>` : null;
+        const mention = dbUser.discordId ? `<@${dbUser.discordId}>` : null;
         await sendDiscordChannelMessage(buildOrderCreatedMessage({ orderId: savedOrder.id, productTitle: product.title, amount, mention, userEmail: session?.user?.email || null }));
       } catch (notifyErr) {
         // ignore notification failures

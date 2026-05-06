@@ -39,6 +39,16 @@ export default function CartPage() {
     fetchCart();
   };
 
+  const handleClearCart = async () => {
+    if (!session) return signIn("discord", { callbackUrl: "/cart" });
+    await fetch("/api/cart", {
+      method: "DELETE",
+      body: JSON.stringify({ clearAll: true }),
+      headers: { "Content-Type": "application/json" },
+    });
+    fetchCart();
+  };
+
   const handleCheckout = async () => {
     if (!session) return signIn("discord", { callbackUrl: "/cart" });
     setLoading(true);
@@ -87,7 +97,7 @@ export default function CartPage() {
 
         <div className="mt-6 flex flex-col gap-3 sm:flex-row">
           <button onClick={handleCheckout} className="w-full rounded-2xl bg-emerald-400 px-4 py-3 font-semibold text-slate-950 sm:w-auto">Finalizar compra</button>
-          <button onClick={fetchCart} className="w-full rounded-2xl border border-white/10 px-4 py-3 sm:w-auto">Atualizar</button>
+          <button onClick={handleClearCart} className="w-full rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 font-semibold text-rose-100 transition hover:bg-rose-500/20 sm:w-auto">Limpar carrinho</button>
         </div>
       </div>
     </main>

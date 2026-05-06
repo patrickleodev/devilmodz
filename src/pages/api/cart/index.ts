@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getServerSession } from "next-auth/next";
+import { In } from "typeorm";
 import { authOptions } from "../../../lib/auth";
 import { ensureDataSource } from "../../../lib/db";
 import { CartItem } from "../../../entities/CartItem";
@@ -15,16 +16,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const cartRepo = dataSource.getRepository(CartItem);
   const productRepo = dataSource.getRepository(Product);
 
+  const loadCartItems = async () => {
+    const items = await cartRepo.find({ where: { userId: sessionUser.id } });
+    const productIds = [...new Set(items.map((item) => item.productId))];
+    const products = productIds.length
+      ? await productRepo.find({ where: { id: In(productIds) } })
+      : [];
+    const productsById = new Map(products.map((product) => [product.id, product]));
+
+    return items.map((item) => ({
+      ...item,
+      product: productsById.get(item.productId) || null,
+    }));
+  };
+
   try {
     if (req.method === "GET") {
-      const items = await cartRepo.find({ where: { userId: sessionUser.id } });
-      const detailed = await Promise.all(
-        items.map(async (it) => {
-          const product = await productRepo.findOneBy({ id: it.productId });
-          return { ...it, product };
-        })
-      );
-      return res.status(200).json({ items: detailed });
+      return res.status(200).json({ items: await loadCartItems() });
     }
 
     if (req.method === "POST") {
@@ -41,15 +49,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         await cartRepo.save(created);
       }
 
-      const items = await cartRepo.find({ where: { userId: sessionUser.id } });
-      const detailed = await Promise.all(
-        items.map(async (it) => ({ ...it, product: await productRepo.findOneBy({ id: it.productId }) }))
-      );
-      return res.status(200).json({ items: detailed });
+      return res.status(200).json({ items: await loadCartItems() });
     }
 
     if (req.method === "DELETE") {
-      const { itemId, productId } = req.body as { itemId?: string; productId?: string };
+      const { itemId, productId, clearAll } = req.body as { itemId?: string; productId?: string; clearAll?: boolean };
+
+      if (clearAll) {
+        await cartRepo.delete({ userId: sessionUser.id } as any);
+        return res.status(200).json({ ok: true });
+      }
+
       if (!itemId && !productId) return res.status(400).json({ error: "itemId or productId required" });
 
       if (itemId) {
