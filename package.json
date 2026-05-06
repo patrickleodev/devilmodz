@@ -8,6 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "docker": "docker compose up --build",
+    "db": "docker compose up -d db",
+    "web": "docker compose up --build app",
     "bot": "tsx src/bot/index.ts",
     "verify-env": "node scripts/validate-env.mjs"
   },

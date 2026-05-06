@@ -171,7 +171,7 @@ client.on(Events.InteractionCreate, async (interaction: Interaction) => {
 
 const bootstrap = async () => {
   await ensureDataSource();
-  await sendDiscordChannelMessage("Bot do Devilmodz iniciado e pronto para receber comandos.");
+  await sendDiscordChannelMessage("Bot do DEVIL MODZ iniciado e pronto para receber comandos.");
   await client.login(token);
 };
 
