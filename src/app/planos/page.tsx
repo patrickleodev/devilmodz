@@ -29,7 +29,7 @@ export default function PlanosPage() {
 
     try {
       setPendingId(productId);
-      const response = await fetch("/api/payments/mercadopago/checkout", {
+      const response = await fetch("/api/payments/infinitepay/checkout", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -39,19 +39,17 @@ export default function PlanosPage() {
 
       const payload = (await response.json()) as {
         error?: string;
-        paymentUrl?: string;
-        initPoint?: string;
-        sandboxInitPoint?: string;
+        checkoutUrl?: string;
       };
 
       if (!response.ok) {
         throw new Error(payload.error || "Falha ao iniciar checkout");
       }
 
-      const redirectUrl = payload.paymentUrl || payload.initPoint || payload.sandboxInitPoint;
+      const redirectUrl = payload.checkoutUrl;
 
       if (!redirectUrl) {
-        throw new Error("Mercado Pago não retornou a URL de pagamento");
+        throw new Error("InfinitePay não retornou a URL de pagamento");
       }
 
       window.location.href = redirectUrl;
@@ -73,7 +71,7 @@ export default function PlanosPage() {
               Escolha o plano ideal para sua upagem.
             </h1>
             <p className="max-w-2xl text-base leading-7 text-slate-300 sm:text-lg">
-              Veja os pacotes disponíveis, entre com Discord e siga direto para o checkout pelo Mercado Pago.
+              Veja os pacotes disponíveis, entre com Discord e siga direto para o checkout pelo InfinitePay.
             </p>
           </div>
 
