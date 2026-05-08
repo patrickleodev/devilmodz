@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 type OrderWithPayment = {
@@ -9,6 +10,8 @@ type OrderWithPayment = {
   productId: string;
   createdAt: string;
   mpPreferenceId?: string;
+  discordThreadUrl?: string | null;
+  product?: { title?: string; name?: string } | null;
   payment?: { status?: string; provider?: string } | null;
 };
 
@@ -96,9 +99,24 @@ export default function PaymentResultClient() {
             <div>
               <p className="text-sm text-slate-400">Pedido: {order.id}</p>
               <p className="text-sm text-slate-400">Valor: R$ {order.amount}</p>
-              <p className="text-sm text-slate-400">Produto: {order.productId}</p>
+              <p className="text-sm text-slate-400">Produto: {order.product?.title || order.product?.name || order.productId}</p>
               <p className="mt-4 text-lg font-medium text-white">Status: {statusLabel}</p>
               <p className="text-xs text-slate-500 mt-2">Criado em: {new Date(order.createdAt).toLocaleString()}</p>
+              <div className="mt-6 flex flex-wrap gap-3">
+                <Link href="/account" className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/10">
+                  Ver histórico de compras
+                </Link>
+                {order.discordThreadUrl ? (
+                  <a
+                    href={order.discordThreadUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="rounded-2xl bg-gradient-to-r from-cyan-400 to-emerald-400 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:brightness-110"
+                  >
+                    Abrir ticket no Discord
+                  </a>
+                ) : null}
+              </div>
             </div>
           ) : (
             <div>Nenhum pedido encontrado.</div>

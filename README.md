@@ -92,5 +92,6 @@ Required environment variables:
 - `DISCORD_BOT_TOKEN`
 - `DISCORD_CLIENT_ID`
 - `DISCORD_NOTIFICATION_CHANNEL_ID`
+- `DISCORD_TICKET_CHANNEL_ID` (optional, use a dedicated channel for automatic tickets)
 - `DISCORD_GUILD_ID` (optional, to register commands in a guild immediately)
 - `DISCORD_STAFF_ROLE_ID` (optional, to authorize delivery commands)

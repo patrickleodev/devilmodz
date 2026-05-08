@@ -3,6 +3,8 @@ import { Routes } from "discord-api-types/v10";
 
 const getDiscordToken = () => process.env.DISCORD_BOT_TOKEN;
 const getNotificationChannelId = () => process.env.DISCORD_NOTIFICATION_CHANNEL_ID;
+const getTicketChannelId = () => process.env.DISCORD_TICKET_CHANNEL_ID || getNotificationChannelId();
+const getGuildId = () => process.env.DISCORD_GUILD_ID;
 
 export const isDiscordNotificationsEnabled = () => {
   return Boolean(getDiscordToken() && getNotificationChannelId());
@@ -18,16 +20,27 @@ const createRestClient = () => {
   return new REST({ version: "10" }).setToken(token);
 };
 
-export const sendDiscordChannelMessage = async (content: string) => {
-  const channelId = getNotificationChannelId();
+type DiscordChannelMessage = {
+  id: string;
+  channel_id: string;
+};
 
+const postDiscordChannelMessage = async (content: string, channelId = getNotificationChannelId()) => {
   if (!channelId) {
-    return false;
+    return null;
   }
 
-  await createRestClient().post(Routes.channelMessages(channelId), {
+  return createRestClient().post(Routes.channelMessages(channelId), {
     body: { content },
-  });
+  }) as Promise<DiscordChannelMessage>;
+};
+
+export const sendDiscordChannelMessage = async (content: string) => {
+  const message = await postDiscordChannelMessage(content);
+
+  if (!message) {
+    return false;
+  }
 
   return true;
 };
@@ -36,12 +49,16 @@ export const buildOrderPaidMessage = (input: {
   orderId: string;
   productTitle: string;
   amount: number;
+  mention?: string | null;
   userEmail?: string | null;
+  providerLabel?: string | null;
 }) => {
   const customerLabel = input.userEmail ? `\nCliente: ${input.userEmail}` : "";
+  const providerLabel = input.providerLabel ? ` via ${input.providerLabel}` : "";
+  const mentionLabel = input.mention ? `${input.mention} ` : "";
 
   return [
-    "Pedido aprovado no Mercado Pago.",
+    `${mentionLabel}Pedido aprovado${providerLabel}.`,
     `Pedido: ${input.orderId}`,
     `Produto: ${input.productTitle}`,
     `Valor: R$ ${input.amount}`,
@@ -87,4 +104,71 @@ export const buildDeliveryMessage = (input: {
   ]
     .filter(Boolean)
     .join("\n");
+};
+
+export const createOrderTicketThread = async (input: {
+  orderId: string;
+  productTitle: string;
+  amount: number;
+  mention?: string | null;
+  userEmail?: string | null;
+  providerLabel?: string | null;
+}) => {
+  const channelId = getTicketChannelId();
+
+  if (!channelId) {
+    return null;
+  }
+
+  const message = await postDiscordChannelMessage(
+    buildOrderPaidMessage({
+      orderId: input.orderId,
+      productTitle: input.productTitle,
+      amount: input.amount,
+      mention: input.mention || null,
+      userEmail: input.userEmail || null,
+      providerLabel: input.providerLabel || null,
+    }),
+    channelId
+  );
+
+  if (!message) {
+    return null;
+  }
+
+  const threadName = `pedido-${input.orderId.slice(0, 8)}`;
+  const thread = (await createRestClient().post(Routes.threads(channelId, message.id), {
+    body: {
+      name: threadName,
+      auto_archive_duration: 1440,
+    },
+  })) as { id?: string };
+
+  if (!thread?.id) {
+    return {
+      messageId: message.id,
+      threadId: null,
+      threadUrl: null,
+    };
+  }
+
+  const guildId = getGuildId();
+
+  return {
+    messageId: message.id,
+    threadId: thread.id,
+    threadUrl: guildId ? `https://discord.com/channels/${guildId}/${thread.id}` : null,
+  };
+};
+
+export const archiveThread = async (threadId?: string | null) => {
+  if (!threadId) return false;
+  try {
+    await createRestClient().patch(Routes.channel(threadId), { body: { archived: true } });
+    return true;
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.warn('Failed to archive thread:', err);
+    return false;
+  }
 };

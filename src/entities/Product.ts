@@ -5,7 +5,7 @@ export class Product {
   @PrimaryGeneratedColumn("uuid")
   id!: string;
 
-  @Column()
+  @Column({ type: "text", nullable: true })
   title!: string;
 
   @Column("text")
@@ -17,7 +17,7 @@ export class Product {
   @Column("int", { default: 0 })
   stock!: number;
 
-  @Column({ default: "manual" })
+  @Column({ type: "text", default: "manual" })
   deliveryType!: string;
 
   @Column("simple-array", { nullable: true })

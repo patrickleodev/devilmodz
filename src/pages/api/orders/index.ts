@@ -5,10 +5,11 @@ import { ensureDataSource } from "../../../lib/db";
 import { Order } from "../../../entities/Order";
 import { Product } from "../../../entities/Product";
 import { Payment } from "../../../entities/Payment";
+import { User } from "../../../entities/User";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const session = await getServerSession(req, res, authOptions);
-  const sessionUser = session?.user as { id?: string } | undefined;
+  const sessionUser = session?.user as { id?: string; email?: string } | undefined;
   if (!sessionUser?.id) return res.status(401).json({ error: "Unauthorized" });
 
   try {
@@ -16,8 +17,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const orderRepo = ds.getRepository(Order);
     const productRepo = ds.getRepository(Product);
     const paymentRepo = ds.getRepository(Payment);
+    const userRepo = ds.getRepository(User);
 
-    const orders = await orderRepo.find({ where: { userId: sessionUser.id }, order: { createdAt: "DESC" } });
+    const where = sessionUser.email
+      ? [{ email: sessionUser.email }, { discordId: sessionUser.id }, { id: sessionUser.id }]
+      : [{ discordId: sessionUser.id }, { id: sessionUser.id }];
+
+    const dbUser = await userRepo.findOne({ where });
+
+    if (!dbUser) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const orders = await orderRepo.find({ where: { userId: dbUser.id }, order: { createdAt: "DESC" } });
 
     const detailed = await Promise.all(
       orders.map(async (o) => {

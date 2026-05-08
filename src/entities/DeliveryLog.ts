@@ -5,10 +5,10 @@ export class DeliveryLog {
   @PrimaryGeneratedColumn("uuid")
   id!: string;
 
-  @Column()
+  @Column({ type: "uuid" })
   orderId!: string;
 
-  @Column({ nullable: true })
+  @Column({ type: "text", nullable: true })
   deliveredBy?: string;
 
   @Column("text")

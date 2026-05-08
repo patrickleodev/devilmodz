@@ -4,7 +4,7 @@ import { Payment } from "../../../../entities/Payment";
 import { Product } from "../../../../entities/Product";
 import { fetchInfinitePayTransaction } from "../../../../lib/infinitepay";
 import { ensureDataSource } from "../../../../lib/db";
-import { buildOrderPaidMessage, sendDiscordChannelMessage } from "../../../../lib/discord";
+import { createOrderTicketThread } from "../../../../lib/discord";
 import { User } from "../../../../entities/User";
 
 const getTransactionIdFromRequest = (req: NextApiRequest) => {
@@ -56,6 +56,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const orderRepository = dataSource.getRepository(Order);
     const paymentRepository = dataSource.getRepository(Payment);
     const productRepository = dataSource.getRepository(Product);
+    const userRepository = dataSource.getRepository(User);
 
     // If we have checkoutId, find payment by it
     let payment = checkoutId
@@ -165,22 +166,33 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (newStatus === "paid" || newStatus === "completed") {
       order.status = "completed";
+      payment.confirmedAt = payment.confirmedAt || new Date();
 
-      // notify Discord about paid order
-      try {
-        const product = await productRepository.findOneBy({ id: order.productId });
-        await sendDiscordChannelMessage(
-          buildOrderPaidMessage({
+      if (!order.discordThreadId) {
+        try {
+          const [product, dbUser] = await Promise.all([
+            productRepository.findOneBy({ id: order.productId }),
+            userRepository.findOneBy({ id: order.userId }),
+          ]);
+
+          const ticket = await createOrderTicketThread({
             orderId: order.id,
             productTitle: product?.title || "Unknown Product",
             amount: order.amount,
-            userEmail: null,
-          })
-        );
-      } catch (notifyErr) {
-        // ignore notification failures
-        // eslint-disable-next-line no-console
-        console.warn("Discord notify failed:", notifyErr);
+            mention: dbUser?.discordId ? `<@${dbUser.discordId}>` : null,
+            userEmail: dbUser?.email || null,
+            providerLabel: "InfinitePay",
+          });
+
+          if (ticket?.threadId) {
+            order.discordThreadId = ticket.threadId;
+            order.discordThreadUrl = ticket.threadUrl || undefined;
+          }
+        } catch (notifyErr) {
+          // ignore notification failures
+          // eslint-disable-next-line no-console
+          console.warn("Discord ticket creation failed:", notifyErr);
+        }
       }
     }
 

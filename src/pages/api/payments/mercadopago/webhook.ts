@@ -3,7 +3,8 @@ import { Order } from "../../../../entities/Order";
 import { Payment } from "../../../../entities/Payment";
 import { fetchMercadoPagoPayment } from "../../../../lib/mercadopago";
 import { ensureDataSource } from "../../../../lib/db";
-import { buildOrderPaidMessage, sendDiscordChannelMessage } from "../../../../lib/discord";
+import { createOrderTicketThread } from "../../../../lib/discord";
+import { User } from "../../../../entities/User";
 
 const getPaymentIdFromRequest = (req: NextApiRequest) => {
   if (typeof req.query.id === "string") {
@@ -43,6 +44,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const dataSource = await ensureDataSource();
     const orderRepository = dataSource.getRepository(Order);
     const paymentRepository = dataSource.getRepository(Payment);
+    const userRepository = dataSource.getRepository(User);
 
     const mpPayment = await fetchMercadoPagoPayment(paymentId);
     const orderId = String(mpPayment.external_reference || mpPayment.metadata?.orderId || "");
@@ -86,17 +88,32 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     await paymentRepository.save(payment);
-    await orderRepository.save(order);
 
     if (mpPayment.status === "approved") {
-      await sendDiscordChannelMessage(
-        buildOrderPaidMessage({
-          orderId: order.id,
-          productTitle: order.productId,
-          amount: order.amount,
-        })
-      );
+      if (!order.discordThreadId) {
+        try {
+          const dbUser = await userRepository.findOneBy({ id: order.userId });
+          const ticket = await createOrderTicketThread({
+            orderId: order.id,
+            productTitle: order.productId,
+            amount: order.amount,
+            mention: dbUser?.discordId ? `<@${dbUser.discordId}>` : null,
+            userEmail: dbUser?.email || null,
+            providerLabel: "Mercado Pago",
+          });
+
+          if (ticket?.threadId) {
+            order.discordThreadId = ticket.threadId;
+            order.discordThreadUrl = ticket.threadUrl || undefined;
+          }
+        } catch (notifyErr) {
+          // eslint-disable-next-line no-console
+          console.warn("Discord ticket creation failed:", notifyErr);
+        }
+      }
     }
+
+    await orderRepository.save(order);
 
     return res.status(200).json({ ok: true });
   } catch (error) {

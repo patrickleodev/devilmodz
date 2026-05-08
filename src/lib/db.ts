@@ -3,9 +3,9 @@ import { Product } from "../entities/Product";
 
 const defaultProducts = [
   {
-    title: "Pacote Starter",
+    title: "Pacote Básico",
     description: "Ideal para quem quer subir rápido sem perder a vibe do personagem.",
-    price: 49,
+    price: 20,
     stock: 999,
     deliveryType: "manual",
     tags: ["starter", "public"],
@@ -13,7 +13,7 @@ const defaultProducts = [
   {
     title: "Pacote Pro",
     description: "Para progresso consistente com acompanhamento durante a execução.",
-    price: 129,
+    price: 50,
     stock: 999,
     deliveryType: "manual",
     tags: ["pro", "public"],
@@ -21,7 +21,7 @@ const defaultProducts = [
   {
     title: "Pacote Elite",
     description: "A opção mais completa, com tratamento premium e entrega priorizada.",
-    price: 249,
+    price: 80,
     stock: 999,
     deliveryType: "manual",
     tags: ["elite", "public"],

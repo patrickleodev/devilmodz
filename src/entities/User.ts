@@ -5,16 +5,16 @@ export class User {
   @PrimaryGeneratedColumn("uuid")
   id!: string;
 
-  @Column({ unique: true })
+  @Column({ type: "text", unique: true, nullable: true })
   email!: string;
 
-  @Column({ nullable: true })
+  @Column({ type: "text", nullable: true })
   name?: string;
 
-  @Column({ nullable: true })
+  @Column({ type: "text", nullable: true })
   discordId?: string;
 
-  @Column({ nullable: true })
+  @Column({ type: "text", nullable: true })
   passwordHash?: string;
 
   @Column("simple-array", { default: "" })

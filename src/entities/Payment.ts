@@ -5,22 +5,22 @@ export class Payment {
   @PrimaryGeneratedColumn("uuid")
   id!: string;
 
-  @Column()
+  @Column({ type: "uuid" })
   orderId!: string;
 
-  @Column()
+  @Column({ type: "text" })
   provider!: string;
 
-  @Column({ nullable: true })
+  @Column({ type: "text", nullable: true })
   providerPaymentId?: string;
 
-  @Column({ default: "pending" })
+  @Column({ type: "text", default: "pending" })
   status!: string;
 
   @Column("json", { nullable: true })
   rawPayload?: any;
 
-  @Column({ nullable: true })
+  @Column({ type: "timestamp", nullable: true })
   confirmedAt?: Date;
 }
 

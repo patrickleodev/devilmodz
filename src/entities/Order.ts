@@ -5,20 +5,26 @@ export class Order {
   @PrimaryGeneratedColumn("uuid")
   id!: string;
 
-  @Column()
+  @Column({ type: "uuid" })
   userId!: string;
 
-  @Column()
+  @Column({ type: "uuid" })
   productId!: string;
 
   @Column("integer")
   amount!: number;
 
-  @Column({ default: "pending" })
+  @Column({ type: "text", default: "pending" })
   status!: string;
 
-  @Column({ nullable: true })
+  @Column({ type: "text", nullable: true })
   mpPreferenceId?: string;
+
+  @Column({ type: "text", nullable: true })
+  discordThreadId?: string;
+
+  @Column({ type: "text", nullable: true })
+  discordThreadUrl?: string;
 
   @CreateDateColumn()
   createdAt!: Date;

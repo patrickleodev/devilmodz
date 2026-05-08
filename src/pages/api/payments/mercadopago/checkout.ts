@@ -15,9 +15,15 @@ type CheckoutBody = {
 };
 
 const PRODUCT_ALIASES: Record<string, string> = {
-  starter: "Pacote Starter",
+  starter: "Pacote Básico",
   pro: "Pacote Pro",
   elite: "Pacote Elite",
+};
+
+const PRODUCT_TITLE_ALIASES: Record<string, string[]> = {
+  starter: ["Pacote Básico", "Pacote Starter"],
+  pro: ["Pacote Pro"],
+  elite: ["Pacote Elite"],
 };
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -58,7 +64,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const product = UUID_PATTERN.test(productId)
       ? await productRepository.findOneBy({ id: productId })
-      : await productRepository.findOneBy({ title: PRODUCT_ALIASES[productId] || productId });
+      : await productRepository.findOne({
+          where: PRODUCT_TITLE_ALIASES[productId]
+            ? PRODUCT_TITLE_ALIASES[productId].map((title) => ({ title }))
+            : [{ title: PRODUCT_ALIASES[productId] || productId }],
+        });
 
     if (!product) {
       return res.status(404).json({ error: "Product not found" });

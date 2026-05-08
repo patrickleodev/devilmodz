@@ -5,10 +5,10 @@ export class CartItem {
   @PrimaryGeneratedColumn("uuid")
   id!: string;
 
-  @Column()
+  @Column({ type: "uuid" })
   userId!: string;
 
-  @Column()
+  @Column({ type: "uuid" })
   productId!: string;
 
   @Column("integer", { default: 1 })
