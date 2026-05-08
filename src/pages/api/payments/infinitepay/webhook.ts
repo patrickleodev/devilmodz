@@ -5,6 +5,7 @@ import { Product } from "../../../../entities/Product";
 import { fetchInfinitePayTransaction } from "../../../../lib/infinitepay";
 import { ensureDataSource } from "../../../../lib/db";
 import { buildOrderPaidMessage, sendDiscordChannelMessage } from "../../../../lib/discord";
+import { User } from "../../../../entities/User";
 
 const getTransactionIdFromRequest = (req: NextApiRequest) => {
   // InfinitePay sends transaction ID in different ways depending on webhook type
@@ -80,13 +81,59 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // Try to fetch from InfinitePay and create the payment record
       if (transactionId) {
         const transaction = await fetchInfinitePayTransaction(transactionId);
+        // Prefer explicit metadata.orderId when available
         const orderId = String(transaction.metadata?.orderId || "");
 
-        if (!orderId) {
-          return res.status(200).json({ ok: true, ignored: true });
+        let order = null;
+
+        if (orderId) {
+          order = await orderRepository.findOneBy({ id: orderId });
         }
 
-        const order = await orderRepository.findOneBy({ id: orderId });
+        // If no orderId in metadata, attempt heuristic reconciliation
+        if (!order) {
+          // Try match by customer email if available
+          const payerEmail = (transaction.metadata && (transaction.metadata.payerEmail || transaction.metadata.email)) || (transaction as any).customer?.email || null;
+
+          if (payerEmail) {
+            const userRepo = dataSource.getRepository(User);
+            const user = await userRepo.findOne({ where: { email: payerEmail } });
+            if (user) {
+              const txAmtRaw = (transaction as any).amount || (transaction as any).transaction_amount || 0;
+              const candidate = await orderRepository.findOne({ where: { userId: user.id, amount: Math.round(txAmtRaw / 100) || txAmtRaw, status: "pending" }, order: { createdAt: "DESC" } });
+              if (candidate) order = candidate;
+            }
+          }
+
+          // Fallback: match by amount + recent time window (30 minutes)
+          if (!order) {
+            const txAmount = (transaction as any).amount || (transaction as any).transaction_amount || 0; // likely in cents
+            const amountCandidates = [] as number[];
+            // possible stored order amounts: in BRL integer (e.g., 49) or cents
+            if (txAmount > 1000) {
+              amountCandidates.push(Math.round(txAmount / 100)); // convert cents to BRL
+            }
+            amountCandidates.push(txAmount); // also try as-is
+
+            const txDate = transaction.createdAt ? new Date(transaction.createdAt) : (transaction as any).approvedAt ? new Date((transaction as any).approvedAt) : new Date();
+            const earliest = new Date(txDate.getTime() - 30 * 60 * 1000);
+            const latest = new Date(txDate.getTime() + 30 * 60 * 1000);
+
+            for (const amt of amountCandidates) {
+              const candidates = await orderRepository.find({ where: { amount: amt, status: "pending" }, order: { createdAt: "DESC" } });
+              if (candidates && candidates.length > 0) {
+                const match = candidates.find((c) => {
+                  const created = new Date(c.createdAt);
+                  return created >= earliest && created <= latest;
+                });
+                if (match) {
+                  order = match;
+                  break;
+                }
+              }
+            }
+          }
+        }
 
         if (!order) {
           return res.status(200).json({ ok: true, ignored: true });

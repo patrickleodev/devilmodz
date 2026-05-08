@@ -147,7 +147,7 @@ export default function PlanosPage() {
 
       <section className="grid gap-4 md:grid-cols-3">
         {[
-          ["Pagamento", "Mercado Pago com fluxo pronto para webhooks e confirmação automática."],
+          ["Pagamento", "InfinitePay com checkout pronto por link e redirecionamento imediato."],
           ["Login", "Autenticação com Discord e base pronta para credenciais administrativas."],
           ["Entrega", "Estrutura preparada para integração com Discord.js e logs de execução."],
         ].map(([title, description]) => (

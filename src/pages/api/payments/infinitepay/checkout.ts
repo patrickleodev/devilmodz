@@ -4,10 +4,10 @@ import { authOptions } from "../../../../lib/auth";
 import { Product } from "../../../../entities/Product";
 import { Order } from "../../../../entities/Order";
 import { Payment } from "../../../../entities/Payment";
-import { createInfinitePayCheckout, getAppBaseUrl } from "../../../../lib/infinitepay";
 import { ensureDataSource } from "../../../../lib/db";
 import { sendDiscordChannelMessage, buildOrderCreatedMessage } from "../../../../lib/discord";
 import { User } from "../../../../entities/User";
+import { products as storeProducts } from "../../../../lib/products";
 
 type CheckoutBody = {
   productId?: string;
@@ -64,46 +64,37 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(404).json({ error: "Product not found" });
     }
 
+    const fallbackPlan = storeProducts.find((plan) => plan.name === product.title);
+    const planId = UUID_PATTERN.test(productId) ? fallbackPlan?.id : productId;
+    const selectedPlan = storeProducts.find((plan) => plan.id === planId);
+    const checkoutUrl = selectedPlan?.checkoutUrl;
+
+    if (!checkoutUrl) {
+      return res.status(400).json({ error: "Checkout link is not configured for this plan" });
+    }
+
     const amount = product.price * quantity;
     const order = orderRepository.create({
       userId: dbUser.id,
       productId: product.id,
       amount,
       status: "pending",
+      mpPreferenceId: checkoutUrl,
     });
 
     const savedOrder = await orderRepository.save(order);
-    const notificationUrl = `${getAppBaseUrl()}/api/payments/infinitepay/webhook`;
-
-    const checkout = await createInfinitePayCheckout({
-      externalReference: savedOrder.id,
-      notificationUrl,
-      items: [
-        {
-          name: product.title,
-          quantity,
-          price: product.price,
-        },
-      ],
-      payerEmail: session?.user?.email || undefined,
-      payerName: session?.user?.name || undefined,
-      metadata: {
-        orderId: savedOrder.id,
-        productId: product.id,
-        userId: dbUser.id,
-      },
-    });
-
-    savedOrder.mpPreferenceId = checkout.id; // reuse field for InfinitePay checkout ID
-    await orderRepository.save(savedOrder);
 
     await paymentRepository.save(
       paymentRepository.create({
         orderId: savedOrder.id,
-        provider: "infinitepay",
-        providerPaymentId: checkout.id,
+        provider: "infinitepay-link",
+        providerPaymentId: selectedPlan?.id,
         status: "pending",
-        rawPayload: checkout,
+        rawPayload: {
+          checkoutUrl,
+          planId: selectedPlan?.id,
+          source: "static-link",
+        },
       })
     );
 
@@ -127,9 +118,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     return res.status(200).json({
       orderId: savedOrder.id,
-      checkoutId: checkout.id,
-      checkoutUrl: checkout.url,
-      qrCode: checkout.qrCode,
+      checkoutUrl,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unexpected error";
