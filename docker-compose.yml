@@ -23,7 +23,6 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3000
-      MERCADO_PAGO_MODE: ${MERCADO_PAGO_MODE:-production}
       TYPEORM_SYNCHRONIZE: "true"
       DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@db:5432/devilmodz}
       NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
@@ -33,7 +32,6 @@ services:
       DISCORD_PUBLIC_KEY: ${DISCORD_PUBLIC_KEY}
       DISCORD_BOT_TOKEN: ${DISCORD_BOT_TOKEN}
       DISCORD_NOTIFICATION_CHANNEL_ID: ${DISCORD_NOTIFICATION_CHANNEL_ID}
-      MERCADO_PAGO_ACCESS_TOKEN: ${MERCADO_PAGO_ACCESS_TOKEN}
       APP_URL: ${APP_URL:-http://localhost:3000}
     ports:
       - "3000:3000"

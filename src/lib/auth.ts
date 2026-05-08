@@ -17,6 +17,9 @@ export const authOptions: NextAuthOptions = {
     DiscordProvider({
       clientId: process.env.DISCORD_CLIENT_ID || "",
       clientSecret: process.env.DISCORD_CLIENT_SECRET || "",
+      httpOptions: {
+        timeout: 15000, // 15 seconds for Discord OAuth token/profile requests
+      },
     }),
     CredentialsProvider({
       name: "Credentials",
@@ -45,14 +48,25 @@ export const authOptions: NextAuthOptions = {
   },
   callbacks: {
     async signIn({ account, profile }) {
-      await ensureDataSource();
-      const repo = AppDataSource.getRepository(User);
-
       try {
+        // eslint-disable-next-line no-console
+        console.log("signIn callback - account provider:", account?.provider);
+        // eslint-disable-next-line no-console
+        console.log("signIn callback - profile:", profile);
+
+        await ensureDataSource();
+        const repo = AppDataSource.getRepository(User);
+
         if (account?.provider === "discord") {
           const discordId = (profile as any)?.id as string | undefined;
           const email = (profile as any)?.email as string | undefined;
+          // eslint-disable-next-line no-console
+          console.log("Discord login - discordId:", discordId, "email:", email);
+
           let dbUser = email ? await repo.findOneBy({ email }) : undefined;
+          // eslint-disable-next-line no-console
+          console.log("Found existing user:", !!dbUser);
+
           if (!dbUser) {
             dbUser = repo.create({
               email: email || `discord:${discordId}`,
@@ -60,17 +74,30 @@ export const authOptions: NextAuthOptions = {
               discordId: discordId || null,
               roles: [],
             } as Partial<User>);
+            // eslint-disable-next-line no-console
+            console.log("Creating new user:", dbUser);
             await repo.save(dbUser);
+            // eslint-disable-next-line no-console
+            console.log("User saved successfully");
           } else if (discordId && !dbUser.discordId) {
             dbUser.discordId = discordId;
             await repo.save(dbUser);
+            // eslint-disable-next-line no-console
+            console.log("Updated user with discordId");
           }
         }
-      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.log("signIn callback - SUCCESS");
         return true;
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.error("Auth signIn error - full error object:", err);
+        // eslint-disable-next-line no-console
+        console.error("Auth signIn error - message:", err instanceof Error ? err.message : String(err));
+        // eslint-disable-next-line no-console
+        console.error("Auth signIn error - stack:", err instanceof Error ? err.stack : "no stack");
+        return false;
       }
-
-      return true;
     },
     async jwt({ token, user }) {
       try {
