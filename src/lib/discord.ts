@@ -282,7 +282,6 @@ export const createOrderTicketThread = async (input: {
 
     console.log("[Discord] Mensagem enviada no canal privado:", msg.id);
 
-    const guildId = getGuildId();
     const threadUrl = guildId ? `https://discord.com/channels/${guildId}/${ticketChannel.id}` : null;
     console.log("[Discord] URL do ticket privado:", threadUrl);
     

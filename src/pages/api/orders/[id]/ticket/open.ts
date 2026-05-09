@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "../../../../../lib/auth";
 import { ensureDataSource } from "../../../../../lib/db";
 import { Order } from "../../../../../entities/Order";
+import { Product } from "../../../../../entities/Product";
 import { User } from "../../../../../entities/User";
 import { createOrderTicketThread } from "../../../../../lib/discord";
 import { resolveDbUser } from "../../../../../lib/session";
@@ -37,10 +38,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(200).json({ threadUrl: order.discordThreadUrl });
     }
 
+    // Fetch product details
+    const productRepo = ds.getRepository(Product);
+    const product = await productRepo.findOneBy({ id: order.productId });
+
     // Create ticket thread
     const ticket = await createOrderTicketThread({
       orderId: order.id,
-      productTitle: order.productId,
+      productTitle: product?.title || "Unknown Product",
       amount: order.amount,
       mention: dbUser.discordId ? `<@${dbUser.discordId}>` : null,
       userEmail: dbUser.email || null,
