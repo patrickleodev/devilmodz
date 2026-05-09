@@ -2,7 +2,6 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { Order } from "../../../../entities/Order";
 import { Payment } from "../../../../entities/Payment";
 import { Product } from "../../../../entities/Product";
-import { fetchInfinitePayTransaction } from "../../../../lib/infinitepay";
 import { ensureDataSource } from "../../../../lib/db";
 import { createOrderTicketThread } from "../../../../lib/discord";
 import { User } from "../../../../entities/User";
@@ -35,6 +34,8 @@ const getCheckoutIdFromRequest = (req: NextApiRequest) => {
 };
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  console.log("[InfinitePay Webhook] Recebido request:", req.method);
+  
   if (req.method === "GET") {
     return res.status(200).json({ ok: true });
   }
@@ -47,6 +48,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const transactionId = getTransactionIdFromRequest(req);
   const checkoutId = getCheckoutIdFromRequest(req);
 
+  console.log("[InfinitePay Webhook] Transaction ID:", transactionId, "Checkout ID:", checkoutId);
+  
   if (!transactionId && !checkoutId) {
     return res.status(200).json({ ok: true, ignored: true });
   }
@@ -79,9 +82,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     if (!payment) {
-      // Try to fetch from InfinitePay and create the payment record
+      // Use webhook payload directly since we don't have API authentication
       if (transactionId) {
-        const transaction = await fetchInfinitePayTransaction(transactionId);
+        const transaction = req.body as any;
         // Prefer explicit metadata.orderId when available
         const orderId = String(transaction.metadata?.orderId || "");
 
@@ -165,11 +168,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     payment.rawPayload = { ...payment.rawPayload, ...req.body };
 
     if (newStatus === "paid" || newStatus === "completed") {
+      console.log("[InfinitePay Webhook] Pagamento confirmado para ordem:", order.id);
       order.status = "completed";
       payment.confirmedAt = payment.confirmedAt || new Date();
 
       if (!order.discordThreadId) {
         try {
+          console.log("[InfinitePay Webhook] Iniciando criação de ticket Discord");
           const [product, dbUser] = await Promise.all([
             productRepository.findOneBy({ id: order.productId }),
             userRepository.findOneBy({ id: order.userId }),
@@ -189,9 +194,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             order.discordThreadUrl = ticket.threadUrl || undefined;
           }
         } catch (notifyErr) {
-          // ignore notification failures
           // eslint-disable-next-line no-console
-          console.warn("Discord ticket creation failed:", notifyErr);
+          console.error("Discord ticket creation failed:", notifyErr instanceof Error ? notifyErr.message : notifyErr);
         }
       }
     }

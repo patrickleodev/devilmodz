@@ -32,24 +32,14 @@ type InfinitePayTransactionResponse = {
 
 type InfinitePayCheckoutMode = "sandbox" | "production";
 
-const getApiKey = () => {
-  const apiKey = process.env.INFINITEPAY_API_KEY;
+const getInfiniteTag = () => {
+  const tag = process.env.INFINITEPAY_TAG;
 
-  if (!apiKey) {
-    throw new Error("INFINITEPAY_API_KEY is not configured");
+  if (!tag) {
+    throw new Error("INFINITEPAY_TAG is not configured");
   }
 
-  return apiKey;
-};
-
-const getClientId = () => {
-  const clientId = process.env.INFINITEPAY_CLIENT_ID;
-
-  if (!clientId) {
-    throw new Error("INFINITEPAY_CLIENT_ID is not configured");
-  }
-
-  return clientId;
+  return tag;
 };
 
 export const getAppBaseUrl = () => {
@@ -78,9 +68,7 @@ const infinitePayRequest = async <T>(path: string, init?: RequestInit): Promise<
   const response = await fetch(`${baseUrl}${path}`, {
     ...init,
     headers: {
-      "Authorization": `Bearer ${getApiKey()}`,
       "Content-Type": "application/json",
-      "X-Client-Id": getClientId(),
       ...(init?.headers || {}),
     },
   });
@@ -99,7 +87,6 @@ export const createInfinitePayCheckout = async (input: CreateCheckoutInput) => {
   return infinitePayRequest<InfinitePayCheckoutResponse>("/v1/checkouts", {
     method: "POST",
     body: JSON.stringify({
-      clientId: getClientId(),
       reference: input.externalReference,
       amount: Math.round(totalAmount * 100), // Convert to cents
       currency: "BRL",

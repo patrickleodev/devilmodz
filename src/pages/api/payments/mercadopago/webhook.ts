@@ -25,6 +25,8 @@ const getPaymentIdFromRequest = (req: NextApiRequest) => {
 };
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  console.log("[MercadoPago Webhook] Recebido request:", req.method);
+  
   if (req.method === "GET") {
     return res.status(200).json({ ok: true });
   }
@@ -36,6 +38,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const paymentId = getPaymentIdFromRequest(req);
 
+  console.log("[MercadoPago Webhook] Payment ID:", paymentId);
+  
   if (!paymentId) {
     return res.status(200).json({ ok: true, ignored: true });
   }
@@ -90,8 +94,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     await paymentRepository.save(payment);
 
     if (mpPayment.status === "approved") {
+      console.log("[MercadoPago Webhook] Pagamento aprovado para ordem:", order.id);
       if (!order.discordThreadId) {
         try {
+          console.log("[MercadoPago Webhook] Iniciando criação de ticket Discord");
           const dbUser = await userRepository.findOneBy({ id: order.userId });
           const ticket = await createOrderTicketThread({
             orderId: order.id,
@@ -108,7 +114,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           }
         } catch (notifyErr) {
           // eslint-disable-next-line no-console
-          console.warn("Discord ticket creation failed:", notifyErr);
+          console.error("Discord ticket creation failed:", notifyErr instanceof Error ? notifyErr.message : notifyErr);
         }
       }
     }

@@ -1,6 +1,27 @@
-import { loadEnvConfig } from "@next/env";
+import nextEnv from "@next/env";
+import fs from "node:fs";
+import path from "node:path";
+
+const { loadEnvConfig } = nextEnv;
 
 loadEnvConfig(process.cwd());
+
+const localEnvPath = path.join(process.cwd(), ".env.local");
+if (fs.existsSync(localEnvPath)) {
+  const localEnv = fs.readFileSync(localEnvPath, "utf8");
+
+  for (const line of localEnv.split(/\r?\n/)) {
+    if (!line || line.startsWith("#") || !line.includes("=")) continue;
+
+    const separatorIndex = line.indexOf("=");
+    const key = line.slice(0, separatorIndex).trim();
+    const value = line.slice(separatorIndex + 1).trim().replace(/^"|"$/g, "");
+
+    if (!process.env[key] && value) {
+      process.env[key] = value;
+    }
+  }
+}
 
 const TOKEN = process.env.DISCORD_BOT_TOKEN;
 const GUILD_ID = process.env.DISCORD_GUILD_ID;
@@ -56,45 +77,67 @@ const checkPermissions = async () => {
     // Test: Try to create a test thread and delete it
     console.log("🧪 Testando permissão de criar thread...\n");
 
-    const testMessageResponse = await fetch(
-      `https://discord.com/api/v10/channels/${TICKET_CHANNEL_ID}/messages`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bot ${TOKEN}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          content: "🧪 Teste de permissão (será deletado em breve)",
-        }),
-      }
-    );
+    let threadResponse;
 
-    if (!testMessageResponse.ok) {
-      const error = await testMessageResponse.text();
-      console.error(`❌ Bot não pode enviar mensagens: ${testMessageResponse.status}`);
-      console.error(`   Erro: ${error}`);
-      process.exit(1);
+    if (channel.type === 15) {
+      threadResponse = await fetch(
+        `https://discord.com/api/v10/channels/${TICKET_CHANNEL_ID}/threads`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bot ${TOKEN}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            name: "test-thread",
+            auto_archive_duration: 1440,
+            message: {
+              content: "🧪 Teste de permissão (será deletado em breve)",
+            },
+          }),
+        }
+      );
+    } else {
+      const testMessageResponse = await fetch(
+        `https://discord.com/api/v10/channels/${TICKET_CHANNEL_ID}/messages`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bot ${TOKEN}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            content: "🧪 Teste de permissão (será deletado em breve)",
+          }),
+        }
+      );
+
+      if (!testMessageResponse.ok) {
+        const error = await testMessageResponse.text();
+        console.error(`❌ Bot não pode enviar mensagens: ${testMessageResponse.status}`);
+        console.error(`   Erro: ${error}`);
+        process.exit(1);
+      }
+
+      const testMessage = await testMessageResponse.json();
+      console.log(`✅ Bot pode enviar mensagens\n`);
+
+      // Test: Create a thread
+      threadResponse = await fetch(
+        `https://discord.com/api/v10/channels/${TICKET_CHANNEL_ID}/${testMessage.id}/threads`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bot ${TOKEN}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            name: "test-thread",
+            auto_archive_duration: 1440,
+          }),
+        }
+      );
     }
-
-    const testMessage = await testMessageResponse.json();
-    console.log(`✅ Bot pode enviar mensagens\n`);
-
-    // Test: Create a thread
-    const threadResponse = await fetch(
-      `https://discord.com/api/v10/channels/${TICKET_CHANNEL_ID}/${testMessage.id}/threads`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bot ${TOKEN}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name: "test-thread",
-          auto_archive_duration: 1440,
-        }),
-      }
-    );
 
     if (!threadResponse.ok) {
       const error = await threadResponse.text();
@@ -102,13 +145,6 @@ const checkPermissions = async () => {
       console.error(`   Erro: ${error}`);
       console.error(`\n💡 Solução: Vá ao Discord, clique direito no canal, Editar > Permissões`);
       console.error(`   Procure pelo bot e certifique que "Create Public Threads" está ✅\n`);
-      
-      // Delete test message
-      await fetch(
-        `https://discord.com/api/v10/channels/${TICKET_CHANNEL_ID}/messages/${testMessage.id}`,
-        { method: "DELETE", headers: { Authorization: `Bot ${TOKEN}` } }
-      );
-      
       process.exit(1);
     }
 
@@ -128,10 +164,12 @@ const checkPermissions = async () => {
       }
     );
 
-    await fetch(
-      `https://discord.com/api/v10/channels/${TICKET_CHANNEL_ID}/messages/${testMessage.id}`,
-      { method: "DELETE", headers: { Authorization: `Bot ${TOKEN}` } }
-    );
+    if (channel.type !== 15) {
+      await fetch(
+        `https://discord.com/api/v10/channels/${TICKET_CHANNEL_ID}/messages/${thread.message?.id}`,
+        { method: "DELETE", headers: { Authorization: `Bot ${TOKEN}` } }
+      );
+    }
 
     console.log("🎉 Tudo pronto! Bot tem todas as permissões necessárias.\n");
     process.exit(0);
