@@ -5,8 +5,10 @@ import { ensureDataSource } from "../../../../../lib/db";
 import { Order } from "../../../../../entities/Order";
 import { User } from "../../../../../entities/User";
 import { archiveThread } from "../../../../../lib/discord";
+import { resolveDbUser } from "../../../../../lib/session";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  res.setHeader('Cache-Control', 'no-store');
   if (req.method !== "POST") {
     res.setHeader("Allow", ["POST"]);
     return res.status(405).json({ error: "Method not allowed" });
@@ -24,11 +26,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const orderRepo = ds.getRepository(Order);
     const userRepo = ds.getRepository(User);
 
-    const where = sessionUser.email
-      ? [{ email: sessionUser.email }, { discordId: sessionUser.id }, { id: sessionUser.id }]
-      : [{ discordId: sessionUser.id }, { id: sessionUser.id }];
-
-    const dbUser = await userRepo.findOne({ where });
+    const dbUser = await resolveDbUser(sessionUser);
     if (!dbUser) return res.status(404).json({ error: "User not found" });
 
     const order = await orderRepo.findOneBy({ id });

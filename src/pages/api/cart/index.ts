@@ -5,8 +5,10 @@ import { authOptions } from "../../../lib/auth";
 import { ensureDataSource } from "../../../lib/db";
 import { CartItem } from "../../../entities/CartItem";
 import { Product } from "../../../entities/Product";
+import { resolveDbUser } from "../../../lib/session";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  res.setHeader('Cache-Control', 'no-store');
   const session = await getServerSession(req, res, authOptions);
   const sessionUser = session?.user as { id?: string } | undefined;
 
@@ -16,8 +18,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const cartRepo = dataSource.getRepository(CartItem);
   const productRepo = dataSource.getRepository(Product);
 
+  const dbUser = await resolveDbUser(sessionUser);
+  if (!dbUser) return res.status(404).json({ error: "User not found" });
+
   const loadCartItems = async () => {
-    const items = await cartRepo.find({ where: { userId: sessionUser.id } });
+    const items = await cartRepo.find({ where: { userId: dbUser.id } });
     const productIds = [...new Set(items.map((item) => item.productId))];
     const products = productIds.length
       ? await productRepo.find({ where: { id: In(productIds) } })
@@ -40,12 +45,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (!productId) return res.status(400).json({ error: "productId required" });
       const qty = Math.max(1, Number(quantity || 1));
 
-      const existing = await cartRepo.findOneBy({ userId: sessionUser.id, productId });
+      const existing = await cartRepo.findOneBy({ userId: dbUser.id, productId });
       if (existing) {
         existing.quantity = qty;
         await cartRepo.save(existing);
       } else {
-        const created = cartRepo.create({ userId: sessionUser.id, productId, quantity: qty });
+        const created = cartRepo.create({ userId: dbUser.id, productId, quantity: qty });
         await cartRepo.save(created);
       }
 
@@ -56,16 +61,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const { itemId, productId, clearAll } = req.body as { itemId?: string; productId?: string; clearAll?: boolean };
 
       if (clearAll) {
-        await cartRepo.delete({ userId: sessionUser.id } as any);
+        await cartRepo.delete({ userId: dbUser.id } as any);
         return res.status(200).json({ ok: true });
       }
 
       if (!itemId && !productId) return res.status(400).json({ error: "itemId or productId required" });
 
       if (itemId) {
-        await cartRepo.delete({ id: itemId, userId: sessionUser.id } as any);
+        await cartRepo.delete({ id: itemId, userId: dbUser.id } as any);
       } else if (productId) {
-        await cartRepo.delete({ userId: sessionUser.id, productId } as any);
+        await cartRepo.delete({ userId: dbUser.id, productId } as any);
       }
 
       return res.status(200).json({ ok: true });

@@ -172,3 +172,31 @@ export const archiveThread = async (threadId?: string | null) => {
     return false;
   }
 };
+
+export const createInviteLink = async (channelId?: string | null) => {
+  const targetChannel = channelId || getTicketChannelId();
+
+  if (!targetChannel) return null;
+
+  try {
+    const invite = (await createRestClient().post(Routes.channelInvites(targetChannel), {
+      body: {
+        max_age: 0, // permanent (no expiration)
+        max_uses: 0, // unlimited uses
+        unique: false, // reuse existing invites for same channel
+      },
+    })) as any;
+
+    // Discord may return either a full url or a code
+    if (!invite) return null;
+
+    if (invite.url) return invite.url as string;
+    if (invite.code) return `https://discord.gg/${invite.code}`;
+
+    return null;
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.warn("Failed to create invite:", err);
+    return null;
+  }
+};

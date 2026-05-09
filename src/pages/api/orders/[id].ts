@@ -6,8 +6,10 @@ import { Order } from "../../../entities/Order";
 import { Product } from "../../../entities/Product";
 import { Payment } from "../../../entities/Payment";
 import { User } from "../../../entities/User";
+import { resolveDbUser } from "../../../lib/session";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  res.setHeader('Cache-Control', 'no-store');
   const session = await getServerSession(req, res, authOptions);
   const sessionUser = session?.user as { id?: string; email?: string } | undefined;
   if (!sessionUser?.id) return res.status(401).json({ error: "Unauthorized" });
@@ -22,11 +24,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const paymentRepo = ds.getRepository(Payment);
     const userRepo = ds.getRepository(User);
 
-    const where = sessionUser.email
-      ? [{ email: sessionUser.email }, { discordId: sessionUser.id }, { id: sessionUser.id }]
-      : [{ discordId: sessionUser.id }, { id: sessionUser.id }];
-
-    const dbUser = await userRepo.findOne({ where });
+    const dbUser = await resolveDbUser(sessionUser);
 
     if (!dbUser) {
       return res.status(404).json({ error: "User not found" });

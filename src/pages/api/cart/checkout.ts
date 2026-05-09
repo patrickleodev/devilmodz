@@ -9,8 +9,10 @@ import { Payment } from "../../../entities/Payment";
 import { createMercadoPagoPreference, getAppBaseUrl, getMercadoPagoCheckoutMode, getMercadoPagoCheckoutUrl } from "../../../lib/mercadopago";
 import { sendDiscordChannelMessage, buildOrderCreatedMessage } from "../../../lib/discord";
 import { User } from "../../../entities/User";
+import { resolveDbUser } from "../../../lib/session";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  res.setHeader('Cache-Control', 'no-store');
   if (req.method !== "POST") {
     res.setHeader("Allow", ["POST"]);
     return res.status(405).json({ error: "Method not allowed" });
@@ -27,7 +29,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const orderRepo = ds.getRepository(Order);
     const paymentRepo = ds.getRepository(Payment);
 
-    const items = await cartRepo.find({ where: { userId: sessionUser.id } });
+    const dbUser = await resolveDbUser(sessionUser);
+    if (!dbUser) return res.status(404).json({ error: "User not found" });
+
+    const items = await cartRepo.find({ where: { userId: dbUser.id } });
     if (!items || items.length === 0) return res.status(400).json({ error: "Cart is empty" });
 
     // load product details and build MP items
@@ -41,7 +46,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const amount = product.price * it.quantity;
       total += amount;
 
-      const order = orderRepo.create({ userId: sessionUser.id, productId: product.id, amount, status: "pending" });
+      const order = orderRepo.create({ userId: dbUser.id, productId: product.id, amount, status: "pending" });
       const saved = await orderRepo.save(order);
       createdOrders.push(saved.id);
 
@@ -54,7 +59,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const preference = await createMercadoPagoPreference({
       externalReference: createdOrders.join(","),
       notificationUrl,
-      metadata: { orderIds: createdOrders, userId: sessionUser.id },
+      metadata: { orderIds: createdOrders, userId: dbUser.id },
       payerEmail: session?.user?.email || undefined,
       items: mpItems,
     });
@@ -73,8 +78,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // notify Discord channel about created orders (mention user if possible)
     try {
-      const userRepo = ds.getRepository(User);
-      const dbUser = await userRepo.findOneBy({ id: sessionUser.id });
+      const userRepo2 = ds.getRepository(User);
+      const dbUser2 = await userRepo2.findOneBy({ id: dbUser.id });
       const mention = dbUser?.discordId ? `<@${dbUser.discordId}>` : null;
       const firstProduct = mpItems[0];
       await sendDiscordChannelMessage(

@@ -3,6 +3,7 @@ import "reflect-metadata";
 import {
   Client,
   Events,
+  GuildMember,
   GatewayIntentBits,
   PermissionsBitField,
   SlashCommandBuilder,
@@ -15,6 +16,8 @@ import { Routes } from "discord-api-types/v10";
 import { ensureDataSource } from "../lib/db";
 import { Order } from "../entities/Order";
 import { DeliveryLog } from "../entities/DeliveryLog";
+import { User } from "../entities/User";
+import { getAppBaseUrl } from "../lib/infinitepay";
 import { buildDeliveryMessage, buildOrderPaidMessage, sendDiscordChannelMessage } from "../lib/discord";
 
 const token = process.env.DISCORD_BOT_TOKEN;
@@ -146,7 +149,7 @@ const markDelivered = async (interaction: ChatInputCommandInteraction) => {
 };
 
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds],
+  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers],
 });
 
 client.once(Events.ClientReady, async () => {
@@ -172,6 +175,52 @@ client.on(Events.InteractionCreate, async (interaction: Interaction) => {
 
   if (interaction.commandName === "pedido-entregar") {
     await markDelivered(interaction);
+  }
+});
+
+client.on(Events.GuildMemberAdd, async (member: GuildMember) => {
+  try {
+    const ds = await ensureDataSource();
+    const userRepo = ds.getRepository(User);
+    const orderRepo = ds.getRepository(Order);
+    const deliveryLogRepo = ds.getRepository(DeliveryLog);
+
+    const dbUser = await userRepo.findOneBy({ discordId: member.id });
+    if (!dbUser) return;
+
+    const orders = await orderRepo.find({ where: { userId: dbUser.id }, order: { createdAt: "DESC" } });
+
+    for (const order of orders) {
+      if (!order.discordThreadId) continue;
+
+      // avoid duplicate follow-ups for same member
+      const existing = await deliveryLogRepo.findOneBy({ orderId: order.id, message: `Member joined: ${member.id}` });
+      if (existing) continue;
+
+      try {
+        const ch = await client.channels.fetch(order.discordThreadId);
+        const appUrl = getAppBaseUrl();
+        const content = `<@${member.id}> Olá! Vimos que você entrou no servidor — seu pedido ${order.id} está com status **${order.status}**. Acompanhe aqui: ${appUrl}/payment-successful?orderId=${order.id}`;
+
+        // send message if channel supports sending
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        if (ch && (ch as any).send) {
+          // @ts-ignore send exists at runtime
+          await (ch as any).send({ content });
+        } else {
+          // fallback to posting to notification channel
+          await sendDiscordChannelMessage(content);
+        }
+
+        await deliveryLogRepo.save(deliveryLogRepo.create({ orderId: order.id, deliveredBy: "bot", message: `Member joined: ${member.id}` }));
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.warn("Failed to send follow-up message for member join:", err);
+      }
+    }
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.warn("Error handling guildMemberAdd:", err);
   }
 });
 
