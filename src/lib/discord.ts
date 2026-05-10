@@ -145,181 +145,185 @@ export const createOrderTicketThread = async (input: {
   const channelId = getTicketChannelId();
 
   if (!channelId) {
-    console.error("[Discord] ERRO: DISCORD_TICKET_CHANNEL_ID não configurado. Check DISCORD_TICKET_CHANNEL_ID or DISCORD_NOTIFICATION_CHANNEL_ID env vars.");
+    console.error("[Discord] ERRO: DISCORD_TICKET_CHANNEL_ID não configurado. Verifique as variáveis de ambiente DISCORD_TICKET_CHANNEL_ID ou DISCORD_NOTIFICATION_CHANNEL_ID.");
     return null;
   }
 
-  console.log("[Discord] Buscando channel com ID:", channelId);
-  const channel = (await createRestClient().get(Routes.channel(channelId))) as APIChannel & {
-    type?: number;
-  };
-
-  console.log("[Discord] Channel encontrado, tipo:", channel.type);
-  
-  const messageContent = buildOrderPaidMessage({
-    orderId: input.orderId,
-    productTitle: input.productTitle,
-    amount: input.amount,
-    mention: input.mention || null,
-    userEmail: input.userEmail || null,
-    providerLabel: input.providerLabel || null,
-  });
-
-  const clientId = extractClientIdFromMention(input.mention);
-  if (!clientId) {
-    console.warn("[Discord] Nenhum discordId encontrado para o cliente; ticket será criado sem acesso do cliente.");
-  }
-
-  // Forum channel (type 15)
-  if (channel.type === ChannelType.GuildForum) {
-    console.log("[Discord] Criando thread privada no forum...");
-    const thread = (await createRestClient().post(Routes.threads(channelId), {
-      body: {
-        name: `pedido-${input.orderId.slice(0, 8)}`,
-        auto_archive_duration: 1440,
-        message: {
-          content: messageContent,
-        },
-      },
-    })) as { id?: string };
-
-    console.log("[Discord] Thread criada com sucesso:", thread.id);
-
-    if (!thread?.id) {
-      console.log("[Discord] ERRO: Thread não retornou ID");
-      return {
-        messageId: null,
-        threadId: null,
-        threadUrl: null,
-      };
-    }
-
-    if (clientId) {
-      try {
-        await addThreadMember(thread.id, clientId);
-      } catch (err) {
-        console.warn('[Discord] Falha ao adicionar cliente à thread (continuando):', err instanceof Error ? err.message : err);
-      }
-    }
-
-    const guildId = getGuildId();
-    const threadUrl = guildId ? `https://discord.com/channels/${guildId}/${thread.id}` : null;
-    console.log("[Discord] URL do ticket:", threadUrl);
-    
-    return {
-      messageId: null,
-      threadId: thread.id,
-      threadUrl,
+  try {
+    console.log("[Discord] Buscando channel com ID:", channelId);
+    const channel = (await createRestClient().get(Routes.channel(channelId))) as APIChannel & {
+      type?: number;
     };
-  }
 
-  // Text channel (type 0) - criar canal privado real
-  if (channel.type === ChannelType.GuildText) {
-    console.log("[Discord] Criando canal de texto privado...");
+    console.log("[Discord] Channel encontrado, tipo:", channel.type);
+    
+    const messageContent = buildOrderPaidMessage({
+      orderId: input.orderId,
+      productTitle: input.productTitle,
+      amount: input.amount,
+      mention: input.mention || null,
+      userEmail: input.userEmail || null,
+      providerLabel: input.providerLabel || null,
+    });
 
-    const guildId = getGuildId();
-    if (!guildId) {
-      throw new Error("DISCORD_GUILD_ID is not configured");
+    const clientId = extractClientIdFromMention(input.mention);
+    if (!clientId) {
+      console.warn("[Discord] Nenhum discordId encontrado para o cliente; ticket será criado sem acesso direto do cliente.");
     }
 
-    const botUserId = await getBotUserId();
-    const permissionOverwrites: DiscordOverwrite[] = [
-      {
-        id: guildId,
-        type: 0,
-        allow: "0",
-        deny: PermissionFlagsBits.ViewChannel.toString(),
-      },
-      {
-        id: botUserId,
-        type: 1,
-        allow:
-          (
-            PermissionFlagsBits.ViewChannel |
-            PermissionFlagsBits.SendMessages |
-            PermissionFlagsBits.ReadMessageHistory |
-            PermissionFlagsBits.ManageMessages
-          ).toString(),
-        deny: "0",
-      },
-    ];
-
-    if (clientId) {
-      permissionOverwrites.push({
-        id: clientId,
-        type: 1,
-        allow:
-          (
-            PermissionFlagsBits.ViewChannel |
-            PermissionFlagsBits.SendMessages |
-            PermissionFlagsBits.ReadMessageHistory
-          ).toString(),
-        deny: "0",
-      });
-    }
-
-    const staffRoleId = getStaffRoleId();
-
-    if (staffRoleId) {
-      permissionOverwrites.push({
-        id: staffRoleId,
-        type: 0,
-        allow:
-          (
-            PermissionFlagsBits.ViewChannel |
-            PermissionFlagsBits.SendMessages |
-            PermissionFlagsBits.ReadMessageHistory |
-            PermissionFlagsBits.ManageMessages
-          ).toString(),
-        deny: "0",
-      });
-    }
-
-    const ticketChannel = (await createRestClient().post(`/guilds/${guildId}/channels`, {
-      body: {
-        name: `pedido-${input.orderId.slice(0, 8)}`,
-        type: ChannelType.GuildText,
-        permission_overwrites: permissionOverwrites,
-        topic: `Ticket privado do pedido ${input.orderId}`,
-      },
-    })) as { id?: string };
-
-    if (!ticketChannel?.id) {
-      console.log("[Discord] ERRO: Canal privado não retornou ID");
-      return {
-        messageId: null,
-        threadId: null,
-        threadUrl: null,
-      };
-    }
-
-    console.log("[Discord] Canal privado criado com sucesso:", ticketChannel.id);
-
-    // Enviar mensagem no canal privado
-    let msg: { id?: string } | null = null;
-    try {
-      msg = (await createRestClient().post(Routes.channelMessages(ticketChannel.id), {
+    // Forum channel (type 15)
+    if (channel.type === ChannelType.GuildForum) {
+      console.log("[Discord] Criando thread privada no forum...");
+      const thread = (await createRestClient().post(Routes.threads(channelId), {
         body: {
-          content: messageContent,
+          name: `pedido-${input.orderId.slice(0, 8)}`,
+          auto_archive_duration: 1440,
+          message: {
+            content: messageContent,
+          },
         },
       })) as { id?: string };
 
-      console.log("[Discord] Mensagem enviada no canal privado:", msg.id);
-    } catch (err) {
-      console.error('[Discord] Erro ao enviar mensagem no canal privado:', err instanceof Error ? err.message : err);
+      console.log("[Discord] Thread criada com sucesso:", thread.id);
+
+      if (!thread?.id) {
+        console.error("[Discord] ERRO: Thread não retornou ID");
+        return null;
+      }
+
+      if (clientId) {
+        try {
+          await addThreadMember(thread.id, clientId);
+        } catch (err) {
+          console.warn('[Discord] Falha ao adicionar cliente à thread (continuando):', err instanceof Error ? err.message : err);
+        }
+      }
+
+      const guildId = getGuildId();
+      const threadUrl = guildId ? `https://discord.com/channels/${guildId}/${thread.id}` : null;
+      console.log("[Discord] URL do ticket:", threadUrl);
+      
+      return {
+        messageId: null,
+        threadId: thread.id,
+        threadUrl,
+      };
     }
 
-    const threadUrl = guildId ? `https://discord.com/channels/${guildId}/${ticketChannel.id}` : null;
-    console.log("[Discord] URL do ticket privado:", threadUrl);
-    
-    return {
-      messageId: msg?.id || null,
-      threadId: ticketChannel.id,
-      threadUrl,
-    };
-  }
+    // Text channel (type 0) - criar canal privado real
+    if (channel.type === ChannelType.GuildText) {
+      console.log("[Discord] Criando canal de texto privado...");
 
-  throw new Error(`DISCORD_TICKET_CHANNEL_ID must point to a text channel (type 0) or forum channel (type 15). Got type: ${channel.type}`);
+      const guildId = getGuildId();
+      if (!guildId) {
+        console.error("[Discord] ERRO: DISCORD_GUILD_ID é obrigatório quando usando Text Channel para tickets. Configure a variável de ambiente DISCORD_GUILD_ID.");
+        return null;
+      }
+
+      const botUserId = await getBotUserId();
+      const permissionOverwrites: DiscordOverwrite[] = [
+        {
+          id: guildId,
+          type: 0,
+          allow: "0",
+          deny: PermissionFlagsBits.ViewChannel.toString(),
+        },
+        {
+          id: botUserId,
+          type: 1,
+          allow:
+            (
+              PermissionFlagsBits.ViewChannel |
+              PermissionFlagsBits.SendMessages |
+              PermissionFlagsBits.ReadMessageHistory |
+              PermissionFlagsBits.ManageMessages
+            ).toString(),
+          deny: "0",
+        },
+      ];
+
+      if (clientId) {
+        permissionOverwrites.push({
+          id: clientId,
+          type: 1,
+          allow:
+            (
+              PermissionFlagsBits.ViewChannel |
+              PermissionFlagsBits.SendMessages |
+              PermissionFlagsBits.ReadMessageHistory
+            ).toString(),
+          deny: "0",
+        });
+      }
+
+      const staffRoleId = getStaffRoleId();
+
+      if (staffRoleId) {
+        permissionOverwrites.push({
+          id: staffRoleId,
+          type: 0,
+          allow:
+            (
+              PermissionFlagsBits.ViewChannel |
+              PermissionFlagsBits.SendMessages |
+              PermissionFlagsBits.ReadMessageHistory |
+              PermissionFlagsBits.ManageMessages
+            ).toString(),
+          deny: "0",
+        });
+      }
+
+      const ticketChannel = (await createRestClient().post(`/guilds/${guildId}/channels`, {
+        body: {
+          name: `pedido-${input.orderId.slice(0, 8)}`,
+          type: ChannelType.GuildText,
+          permission_overwrites: permissionOverwrites,
+          topic: `Ticket privado do pedido ${input.orderId}`,
+        },
+      })) as { id?: string };
+
+      if (!ticketChannel?.id) {
+        console.error("[Discord] ERRO: Canal privado não retornou ID");
+        return null;
+      }
+
+      console.log("[Discord] Canal privado criado com sucesso:", ticketChannel.id);
+
+      // Enviar mensagem no canal privado
+      let msg: { id?: string } | null = null;
+      try {
+        msg = (await createRestClient().post(Routes.channelMessages(ticketChannel.id), {
+          body: {
+            content: messageContent,
+          },
+        })) as { id?: string };
+
+        console.log("[Discord] Mensagem enviada no canal privado:", msg.id);
+      } catch (err) {
+        console.error('[Discord] Erro ao enviar mensagem no canal privado:', err instanceof Error ? err.message : err);
+      }
+
+      const threadUrl = guildId ? `https://discord.com/channels/${guildId}/${ticketChannel.id}` : null;
+      console.log("[Discord] URL do ticket privado:", threadUrl);
+      
+      return {
+        messageId: msg?.id || null,
+        threadId: ticketChannel.id,
+        threadUrl,
+      };
+    }
+
+    throw new Error(`DISCORD_TICKET_CHANNEL_ID deve apontar para um Text Channel (tipo 0) ou Forum Channel (tipo 15). Tipo encontrado: ${channel.type}`);
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error("[Discord] ERRO ao criar ticket:", errorMessage);
+    
+    if (errorMessage.includes("Missing Permissions")) {
+      console.error("[Discord] 💡 Solução: O bot não tem permissão para criar canais. Verifique as permissões do bot no Discord.");
+    }
+    
+    return null;
+  }
 };
 
 const extractClientIdFromMention = (clientMentionStr?: string | null): string | null => {
