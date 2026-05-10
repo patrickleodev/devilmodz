@@ -167,7 +167,7 @@ export const createOrderTicketThread = async (input: {
 
   const clientId = extractClientIdFromMention(input.mention);
   if (!clientId) {
-    console.warn("[Discord] Nenhum discordId encontrado para o cliente; ticket privado não será criado com acesso do cliente.");
+    console.warn("[Discord] Nenhum discordId encontrado para o cliente; ticket será criado sem acesso do cliente.");
   }
 
   // Forum channel (type 15)
@@ -212,9 +212,6 @@ export const createOrderTicketThread = async (input: {
   // Text channel (type 0) - criar canal privado real
   if (channel.type === ChannelType.GuildText) {
     console.log("[Discord] Criando canal de texto privado...");
-    if (!clientId) {
-      throw new Error("Cannot create a private ticket thread without a Discord user mention");
-    }
 
     const guildId = getGuildId();
     if (!guildId) {
@@ -230,17 +227,6 @@ export const createOrderTicketThread = async (input: {
         deny: PermissionFlagsBits.ViewChannel.toString(),
       },
       {
-        id: clientId,
-        type: 1,
-        allow:
-          (
-            PermissionFlagsBits.ViewChannel |
-            PermissionFlagsBits.SendMessages |
-            PermissionFlagsBits.ReadMessageHistory
-          ).toString(),
-        deny: "0",
-      },
-      {
         id: botUserId,
         type: 1,
         allow:
@@ -253,6 +239,20 @@ export const createOrderTicketThread = async (input: {
         deny: "0",
       },
     ];
+
+    if (clientId) {
+      permissionOverwrites.push({
+        id: clientId,
+        type: 1,
+        allow:
+          (
+            PermissionFlagsBits.ViewChannel |
+            PermissionFlagsBits.SendMessages |
+            PermissionFlagsBits.ReadMessageHistory
+          ).toString(),
+        deny: "0",
+      });
+    }
 
     const staffRoleId = getStaffRoleId();
 
