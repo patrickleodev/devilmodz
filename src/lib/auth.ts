@@ -107,20 +107,28 @@ export const authOptions: NextAuthOptions = {
         }
 
         if ((!token.roles || token.roles.length === 0) && (token.id || token.email)) {
-          const dbUser = await resolveDbUser({
-            id: typeof token.id === "string" ? token.id : undefined,
-            email: typeof token.email === "string" ? token.email : undefined,
-          });
+          try {
+            const dbUser = await resolveDbUser({
+              id: typeof token.id === "string" ? token.id : undefined,
+              email: typeof token.email === "string" ? token.email : undefined,
+            });
 
-          if (dbUser?.roles?.length) {
-            token.roles = dbUser.roles;
+            if (dbUser?.roles?.length) {
+              token.roles = dbUser.roles;
+            }
+          } catch (err) {
+            // eslint-disable-next-line no-console
+            console.error("Auth jwt callback - could not resolve roles from DB:", err);
           }
         }
 
         token.roles = token.roles || [];
         return token;
       } catch (err) {
-        throw err;
+        // eslint-disable-next-line no-console
+        console.error("Auth jwt callback error:", err);
+        token.roles = token.roles || [];
+        return token;
       }
     },
     async session({ session, token }) {
@@ -129,7 +137,9 @@ export const authOptions: NextAuthOptions = {
         (session as any).user.roles = token.roles || [];
         return session;
       } catch (err) {
-        throw err;
+        // eslint-disable-next-line no-console
+        console.error("Auth session callback error:", err);
+        return session;
       }
     },
   },
