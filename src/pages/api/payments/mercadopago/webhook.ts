@@ -1,10 +1,93 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { Order } from "../../../../entities/Order";
 import { Payment } from "../../../../entities/Payment";
 import { fetchMercadoPagoPayment } from "../../../../lib/mercadopago";
 import { ensureDataSource } from "../../../../lib/db";
 import { createOrderTicketThread } from "../../../../lib/discord";
 import { User } from "../../../../entities/User";
+
+type OrderRow = {
+  id: string;
+  userId: string;
+  productId: string;
+  amount: number;
+  status: string;
+  createdAt: Date;
+  discordThreadId?: string | null;
+  discordThreadUrl?: string | null;
+};
+
+const getOrderColumnPresence = async (dataSource: Awaited<ReturnType<typeof ensureDataSource>>) => {
+  const [columnPresence] = (await dataSource.query(
+    `
+    SELECT
+      EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'orders'
+          AND column_name = 'discordThreadId'
+      ) AS "hasDiscordThreadId",
+      EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'orders'
+          AND column_name = 'discordThreadUrl'
+      ) AS "hasDiscordThreadUrl"
+    `
+  )) as Array<{ hasDiscordThreadId: boolean; hasDiscordThreadUrl: boolean }>;
+
+  return {
+    hasDiscordThreadId: Boolean(columnPresence?.hasDiscordThreadId),
+    hasDiscordThreadUrl: Boolean(columnPresence?.hasDiscordThreadUrl),
+  };
+};
+
+const loadOrderById = async (dataSource: Awaited<ReturnType<typeof ensureDataSource>>, id: string) => {
+  const presence = await getOrderColumnPresence(dataSource);
+  const selectColumns = [`"id"`, `"userId"`, `"productId"`, `"amount"`, `"status"`, `"createdAt"`];
+
+  if (presence.hasDiscordThreadId) selectColumns.push(`"discordThreadId"`);
+  if (presence.hasDiscordThreadUrl) selectColumns.push(`"discordThreadUrl"`);
+
+  const [order] = (await dataSource.query(
+    `SELECT ${selectColumns.join(", ")}
+     FROM "orders"
+     WHERE "id" = $1`,
+    [id]
+  )) as Array<OrderRow>;
+
+  return { order, presence };
+};
+
+const updateOrderStatus = async (
+  dataSource: Awaited<ReturnType<typeof ensureDataSource>>,
+  id: string,
+  status: string,
+  ticket?: { threadId?: string | null; threadUrl?: string | null }
+) => {
+  const presence = await getOrderColumnPresence(dataSource);
+  const setClauses = [`"status" = $2`];
+  const values: Array<string | null> = [id, status];
+
+  if (presence.hasDiscordThreadId && ticket?.threadId) {
+    setClauses.push(`"discordThreadId" = $3`);
+    values.push(ticket.threadId);
+  }
+
+  if (presence.hasDiscordThreadUrl) {
+    const urlIndex = values.length + 1;
+    setClauses.push(`"discordThreadUrl" = $${urlIndex}`);
+    values.push(ticket?.threadUrl || null);
+  }
+
+  await dataSource.query(
+    `UPDATE "orders"
+     SET ${setClauses.join(", ")}
+     WHERE "id" = $1`,
+    values
+  );
+};
 
 const getPaymentIdFromRequest = (req: NextApiRequest) => {
   if (typeof req.query.id === "string") {
@@ -46,7 +129,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     const dataSource = await ensureDataSource();
-    const orderRepository = dataSource.getRepository(Order);
     const paymentRepository = dataSource.getRepository(Payment);
     const userRepository = dataSource.getRepository(User);
 
@@ -57,7 +139,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(200).json({ ok: true, ignored: true });
     }
 
-    const order = await orderRepository.findOneBy({ id: orderId });
+    const { order } = await loadOrderById(dataSource, orderId);
 
     if (!order) {
       return res.status(200).json({ ok: true, ignored: true });
@@ -109,17 +191,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           });
 
           if (ticket?.threadId) {
-            order.discordThreadId = ticket.threadId;
-            order.discordThreadUrl = ticket.threadUrl || undefined;
+            await updateOrderStatus(dataSource, order.id, "paid", ticket);
+          } else {
+            await updateOrderStatus(dataSource, order.id, "paid");
           }
         } catch (notifyErr) {
           // eslint-disable-next-line no-console
           console.error("Discord ticket creation failed:", notifyErr instanceof Error ? notifyErr.message : notifyErr);
         }
+      } else {
+        await updateOrderStatus(dataSource, order.id, "paid", {
+          threadId: order.discordThreadId,
+          threadUrl: order.discordThreadUrl || undefined,
+        });
       }
     }
-
-    await orderRepository.save(order);
 
     return res.status(200).json({ ok: true });
   } catch (error) {

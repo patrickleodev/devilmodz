@@ -1,10 +1,93 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { Order } from "../../../../entities/Order";
 import { Payment } from "../../../../entities/Payment";
 import { Product } from "../../../../entities/Product";
 import { ensureDataSource } from "../../../../lib/db";
 import { createOrderTicketThread } from "../../../../lib/discord";
 import { User } from "../../../../entities/User";
+
+type OrderRow = {
+  id: string;
+  userId: string;
+  productId: string;
+  amount: number;
+  status: string;
+  createdAt: Date;
+  discordThreadId?: string | null;
+  discordThreadUrl?: string | null;
+};
+
+const getOrderColumnPresence = async (dataSource: Awaited<ReturnType<typeof ensureDataSource>>) => {
+  const [columnPresence] = (await dataSource.query(
+    `
+    SELECT
+      EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'orders'
+          AND column_name = 'discordThreadId'
+      ) AS "hasDiscordThreadId",
+      EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'orders'
+          AND column_name = 'discordThreadUrl'
+      ) AS "hasDiscordThreadUrl"
+    `
+  )) as Array<{ hasDiscordThreadId: boolean; hasDiscordThreadUrl: boolean }>;
+
+  return {
+    hasDiscordThreadId: Boolean(columnPresence?.hasDiscordThreadId),
+    hasDiscordThreadUrl: Boolean(columnPresence?.hasDiscordThreadUrl),
+  };
+};
+
+const loadOrderById = async (dataSource: Awaited<ReturnType<typeof ensureDataSource>>, id: string) => {
+  const presence = await getOrderColumnPresence(dataSource);
+  const selectColumns = [`"id"`, `"userId"`, `"productId"`, `"amount"`, `"status"`, `"createdAt"`];
+
+  if (presence.hasDiscordThreadId) selectColumns.push(`"discordThreadId"`);
+  if (presence.hasDiscordThreadUrl) selectColumns.push(`"discordThreadUrl"`);
+
+  const [order] = (await dataSource.query(
+    `SELECT ${selectColumns.join(", ")}
+     FROM "orders"
+     WHERE "id" = $1`,
+    [id]
+  )) as Array<OrderRow>;
+
+  return { order, presence };
+};
+
+const updateOrderStatus = async (
+  dataSource: Awaited<ReturnType<typeof ensureDataSource>>,
+  id: string,
+  status: string,
+  ticket?: { threadId?: string | null; threadUrl?: string | null }
+) => {
+  const presence = await getOrderColumnPresence(dataSource);
+  const setClauses = [`"status" = $2`];
+  const values: Array<string | null> = [id, status];
+
+  if (presence.hasDiscordThreadId && ticket?.threadId) {
+    setClauses.push(`"discordThreadId" = $3`);
+    values.push(ticket.threadId);
+  }
+
+  if (presence.hasDiscordThreadUrl) {
+    const urlIndex = values.length + 1;
+    setClauses.push(`"discordThreadUrl" = $${urlIndex}`);
+    values.push(ticket?.threadUrl || null);
+  }
+
+  await dataSource.query(
+    `UPDATE "orders"
+     SET ${setClauses.join(", ")}
+     WHERE "id" = $1`,
+    values
+  );
+};
 
 const getTransactionIdFromRequest = (req: NextApiRequest) => {
   // InfinitePay sends transaction ID in different ways depending on webhook type
@@ -56,7 +139,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     const dataSource = await ensureDataSource();
-    const orderRepository = dataSource.getRepository(Order);
     const paymentRepository = dataSource.getRepository(Payment);
     const productRepository = dataSource.getRepository(Product);
     const userRepository = dataSource.getRepository(User);
@@ -91,7 +173,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         let order = null;
 
         if (orderId) {
-          order = await orderRepository.findOneBy({ id: orderId });
+          order = (await loadOrderById(dataSource, orderId)).order;
         }
 
         // If no orderId in metadata, attempt heuristic reconciliation
@@ -104,8 +186,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             const user = await userRepo.findOne({ where: { email: payerEmail } });
             if (user) {
               const txAmtRaw = (transaction as any).amount || (transaction as any).transaction_amount || 0;
-              const candidate = await orderRepository.findOne({ where: { userId: user.id, amount: Math.round(txAmtRaw / 100) || txAmtRaw, status: "pending" }, order: { createdAt: "DESC" } });
-              if (candidate) order = candidate;
+              const candidate = (await dataSource.query(
+                `SELECT "id", "userId", "productId", "amount", "status", "createdAt"
+                 FROM "orders"
+                 WHERE "userId" = $1 AND "amount" = $2 AND "status" = 'pending'
+                 ORDER BY "createdAt" DESC
+                 LIMIT 1`,
+                [user.id, Math.round(txAmtRaw / 100) || txAmtRaw]
+              )) as Array<OrderRow>;
+              if (candidate.length > 0) order = candidate[0];
             }
           }
 
@@ -124,7 +213,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             const latest = new Date(txDate.getTime() + 30 * 60 * 1000);
 
             for (const amt of amountCandidates) {
-              const candidates = await orderRepository.find({ where: { amount: amt, status: "pending" }, order: { createdAt: "DESC" } });
+              const candidates = (await dataSource.query(
+                `SELECT "id", "userId", "productId", "amount", "status", "createdAt"
+                 FROM "orders"
+                 WHERE "amount" = $1 AND "status" = 'pending'
+                 ORDER BY "createdAt" DESC`,
+                [amt]
+              )) as Array<OrderRow>;
               if (candidates && candidates.length > 0) {
                 const match = candidates.find((c) => {
                   const created = new Date(c.createdAt);
@@ -155,7 +250,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     }
 
-    const order = await orderRepository.findOneBy({ id: payment.orderId });
+    const { order } = await loadOrderById(dataSource, payment.orderId);
 
     if (!order) {
       return res.status(200).json({ ok: true, ignored: true });
@@ -169,7 +264,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (newStatus === "paid" || newStatus === "completed") {
       console.log("[InfinitePay Webhook] Pagamento confirmado para ordem:", order.id);
-      order.status = "completed";
       payment.confirmedAt = payment.confirmedAt || new Date();
 
       if (!order.discordThreadId) {
@@ -190,18 +284,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           });
 
           if (ticket?.threadId) {
-            order.discordThreadId = ticket.threadId;
-            order.discordThreadUrl = ticket.threadUrl || undefined;
+            await updateOrderStatus(dataSource, order.id, "completed", ticket);
+          } else {
+            await updateOrderStatus(dataSource, order.id, "completed");
           }
         } catch (notifyErr) {
           // eslint-disable-next-line no-console
           console.error("Discord ticket creation failed:", notifyErr instanceof Error ? notifyErr.message : notifyErr);
         }
+      } else {
+        await updateOrderStatus(dataSource, order.id, "completed", {
+          threadId: order.discordThreadId,
+          threadUrl: order.discordThreadUrl || undefined,
+        });
       }
     }
 
     await paymentRepository.save(payment);
-    await orderRepository.save(order);
 
     return res.status(200).json({ ok: true });
   } catch (error) {

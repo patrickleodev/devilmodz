@@ -5,7 +5,7 @@ const defaultProducts = [
   {
     title: "Pacote Básico",
     description: "Ideal para quem quer subir rápido sem perder a vibe do personagem.",
-    price: 20,
+    price: 19.9,
     stock: 999,
     deliveryType: "manual",
     tags: ["starter", "public"],
@@ -13,7 +13,7 @@ const defaultProducts = [
   {
     title: "Pacote Pro",
     description: "Para progresso consistente com acompanhamento durante a execução.",
-    price: 50,
+    price: 49.9,
     stock: 999,
     deliveryType: "manual",
     tags: ["pro", "public"],
@@ -21,7 +21,7 @@ const defaultProducts = [
   {
     title: "Pacote Elite",
     description: "A opção mais completa, com tratamento premium e entrega priorizada.",
-    price: 80,
+    price: 79.9,
     stock: 999,
     deliveryType: "manual",
     tags: ["elite", "public"],
@@ -38,6 +38,20 @@ export const ensureDataSource = async () => {
 
   if (existingProducts.length === 0) {
     await productRepository.save(defaultProducts.map((product) => productRepository.create(product)));
+  } else {
+    const defaultByTitle = new Map(defaultProducts.map((product) => [product.title, product] as const));
+
+    for (const product of existingProducts) {
+      const defaultProduct = defaultByTitle.get(product.title);
+      if (defaultProduct && product.price !== defaultProduct.price) {
+        product.price = defaultProduct.price;
+        product.description = defaultProduct.description;
+        product.stock = defaultProduct.stock;
+        product.deliveryType = defaultProduct.deliveryType;
+        product.tags = defaultProduct.tags;
+        await productRepository.save(product);
+      }
+    }
   }
 
   return AppDataSource;
