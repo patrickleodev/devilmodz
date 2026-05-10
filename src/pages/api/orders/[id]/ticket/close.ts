@@ -2,8 +2,6 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "../../../../../lib/auth";
 import { ensureDataSource } from "../../../../../lib/db";
-import { Order } from "../../../../../entities/Order";
-import { User } from "../../../../../entities/User";
 import { archiveThread } from "../../../../../lib/discord";
 import { resolveDbUser } from "../../../../../lib/session";
 
@@ -23,7 +21,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     const ds = await ensureDataSource();
-    const userRepo = ds.getRepository(User);
 
     const dbUser = await resolveDbUser(sessionUser);
     if (!dbUser) return res.status(404).json({ error: "User not found" });
@@ -46,9 +43,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (!ok) return res.status(500).json({ error: "Failed to archive thread" });
 
-    order.discordThreadId = undefined as any;
-    order.discordThreadUrl = undefined as any;
-    await orderRepo.save(order);
+    await ds.query(
+      `UPDATE "orders"
+       SET "discordThreadId" = NULL,
+           "discordThreadUrl" = NULL
+       WHERE "id" = $1`,
+      [id]
+    );
 
     return res.status(200).json({ ok: true });
   } catch (err) {
