@@ -260,10 +260,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         payment = paymentRepository.create({
           orderId: order.id,
           provider: "infinitepay",
-          providerPaymentId: transactionId,
+          providerPaymentId: transactionId ?? undefined,
           status: transaction.status,
           rawPayload: transaction,
-        });
+        } as Partial<Payment>);
     } else if (checkoutId && payment.provider !== "infinitepay") {
       payment.provider = "infinitepay";
     }
