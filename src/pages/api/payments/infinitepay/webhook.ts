@@ -16,6 +16,22 @@ type OrderRow = {
   discordThreadUrl?: string | null;
 };
 
+const toOrderAmountCandidates = (rawAmount: number) => {
+  const candidates = new Set<number>();
+
+  if (!Number.isFinite(rawAmount) || rawAmount <= 0) {
+    return [] as number[];
+  }
+
+  candidates.add(Number(rawAmount.toFixed(2)));
+
+  if (rawAmount > 1000) {
+    candidates.add(Number((rawAmount / 100).toFixed(2)));
+  }
+
+  return Array.from(candidates);
+};
+
 const getOrderColumnPresence = async (dataSource: Awaited<ReturnType<typeof ensureDataSource>>) => {
   const [columnPresence] = (await dataSource.query(
     `
@@ -186,13 +202,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             const user = await userRepo.findOne({ where: { email: payerEmail } });
             if (user) {
               const txAmtRaw = (transaction as any).amount || (transaction as any).transaction_amount || 0;
+              const userAmountCandidates = toOrderAmountCandidates(txAmtRaw);
               const candidate = (await dataSource.query(
                 `SELECT "id", "userId", "productId", "amount", "status", "createdAt"
                  FROM "orders"
-                 WHERE "userId" = $1 AND "amount" = $2 AND "status" = 'pending'
+                 WHERE "userId" = $1 AND ABS("amount" - $2::numeric) < 0.01 AND "status" = 'pending'
                  ORDER BY "createdAt" DESC
                  LIMIT 1`,
-                [user.id, Math.round(txAmtRaw / 100) || txAmtRaw]
+                [user.id, userAmountCandidates[0] || txAmtRaw]
               )) as Array<OrderRow>;
               if (candidate.length > 0) order = candidate[0];
             }
@@ -201,12 +218,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           // Fallback: match by amount + recent time window (30 minutes)
           if (!order) {
             const txAmount = (transaction as any).amount || (transaction as any).transaction_amount || 0; // likely in cents
-            const amountCandidates = [] as number[];
-            // possible stored order amounts: in BRL integer (e.g., 49) or cents
-            if (txAmount > 1000) {
-              amountCandidates.push(Math.round(txAmount / 100)); // convert cents to BRL
-            }
-            amountCandidates.push(txAmount); // also try as-is
+            const amountCandidates = toOrderAmountCandidates(txAmount);
 
             const txDate = transaction.createdAt ? new Date(transaction.createdAt) : (transaction as any).approvedAt ? new Date((transaction as any).approvedAt) : new Date();
             const earliest = new Date(txDate.getTime() - 30 * 60 * 1000);
@@ -216,7 +228,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               const candidates = (await dataSource.query(
                 `SELECT "id", "userId", "productId", "amount", "status", "createdAt"
                  FROM "orders"
-                 WHERE "amount" = $1 AND "status" = 'pending'
+                 WHERE ABS("amount" - $1::numeric) < 0.01 AND "status" = 'pending'
                  ORDER BY "createdAt" DESC`,
                 [amt]
               )) as Array<OrderRow>;
