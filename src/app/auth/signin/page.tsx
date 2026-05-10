@@ -14,8 +14,8 @@ const errorMessages: Record<string, string> = {
 
 export default function SignInPage() {
   const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get("callbackUrl") || "/";
-  const error = searchParams.get("error") || "";
+  const callbackUrl = searchParams?.get("callbackUrl") || "/";
+  const error = searchParams?.get("error") || "";
   const message = errorMessages[error] || errorMessages.Default;
 
   return (
