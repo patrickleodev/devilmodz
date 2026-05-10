@@ -167,6 +167,8 @@ export const createOrderTicketThread = async (input: {
     });
 
     const clientId = extractClientIdFromMention(input.mention);
+    console.log("[Discord] Mention string recebida:", input.mention);
+    console.log("[Discord] Client ID extraído:", clientId);
     if (!clientId) {
       console.warn("[Discord] Nenhum discordId encontrado para o cliente; ticket será criado sem acesso direto do cliente.");
     }
@@ -215,11 +217,8 @@ export const createOrderTicketThread = async (input: {
       console.log("[Discord] Criando canal de texto privado...");
 
       const guildId = getGuildId();
-      if (!guildId) {
-        console.error("[Discord] ERRO: DISCORD_GUILD_ID é obrigatório quando usando Text Channel para tickets. Configure a variável de ambiente DISCORD_GUILD_ID.");
-        return null;
-      }
-
+        console.log("[Discord] Guild ID:", guildId);
+        
       const botUserId = await getBotUserId();
       const permissionOverwrites: DiscordOverwrite[] = [
         {
