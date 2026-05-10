@@ -132,6 +132,76 @@ const getCheckoutIdFromRequest = (req: NextApiRequest) => {
   return body?.checkoutId || body?.checkout_id || null;
 };
 
+const findOrderForWebhook = async (
+  dataSource: Awaited<ReturnType<typeof ensureDataSource>>,
+  payload: any,
+  transactionId?: string | null
+) => {
+  const orderId = String(payload?.metadata?.orderId || payload?.external_reference || payload?.reference || "");
+
+  if (orderId) {
+    const loaded = await loadOrderById(dataSource, orderId);
+    if (loaded.order) {
+      return loaded.order;
+    }
+  }
+
+  const payerEmail = payload?.metadata?.payerEmail || payload?.metadata?.email || payload?.customer?.email || null;
+
+  if (payerEmail) {
+    const userRepo = dataSource.getRepository(User);
+    const user = await userRepo.findOne({ where: { email: payerEmail } });
+    if (user) {
+      const txAmount = Number(payload?.amount || payload?.transaction_amount || 0);
+      const amountCandidates = toOrderAmountCandidates(txAmount);
+
+      for (const amt of amountCandidates) {
+        const candidates = (await dataSource.query(
+          `SELECT "id", "userId", "productId", "amount", "status", "createdAt"
+           FROM "orders"
+           WHERE "userId" = $1 AND ABS("amount" - $2::numeric) < 0.01 AND "status" = 'pending'
+           ORDER BY "createdAt" DESC
+           LIMIT 1`,
+          [user.id, amt]
+        )) as Array<OrderRow>;
+
+        if (candidates.length > 0) {
+          return candidates[0];
+        }
+      }
+    }
+  }
+
+  if (transactionId || payload?.amount || payload?.transaction_amount) {
+    const txAmount = Number(payload?.amount || payload?.transaction_amount || 0);
+    const amountCandidates = toOrderAmountCandidates(txAmount);
+    const txDate = payload?.createdAt ? new Date(payload.createdAt) : payload?.approvedAt ? new Date(payload.approvedAt) : new Date();
+    const earliest = new Date(txDate.getTime() - 30 * 60 * 1000);
+    const latest = new Date(txDate.getTime() + 30 * 60 * 1000);
+
+    for (const amt of amountCandidates) {
+      const candidates = (await dataSource.query(
+        `SELECT "id", "userId", "productId", "amount", "status", "createdAt"
+         FROM "orders"
+         WHERE ABS("amount" - $1::numeric) < 0.01 AND "status" = 'pending'
+         ORDER BY "createdAt" DESC`,
+        [amt]
+      )) as Array<OrderRow>;
+
+      const match = candidates.find((c) => {
+        const created = new Date(c.createdAt);
+        return created >= earliest && created <= latest;
+      });
+
+      if (match) {
+        return match;
+      }
+    }
+  }
+
+  return null;
+};
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   console.log("[InfinitePay Webhook] Recebido request:", req.method);
   
@@ -180,71 +250,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     if (!payment) {
-      // Use webhook payload directly since we don't have API authentication
-      if (transactionId) {
-        const transaction = req.body as any;
-        // Prefer explicit metadata.orderId when available
-        const orderId = String(transaction.metadata?.orderId || "");
-
-        let order = null;
-
-        if (orderId) {
-          order = (await loadOrderById(dataSource, orderId)).order;
-        }
-
-        // If no orderId in metadata, attempt heuristic reconciliation
-        if (!order) {
-          // Try match by customer email if available
-          const payerEmail = (transaction.metadata && (transaction.metadata.payerEmail || transaction.metadata.email)) || (transaction as any).customer?.email || null;
-
-          if (payerEmail) {
-            const userRepo = dataSource.getRepository(User);
-            const user = await userRepo.findOne({ where: { email: payerEmail } });
-            if (user) {
-              const txAmtRaw = (transaction as any).amount || (transaction as any).transaction_amount || 0;
-              const userAmountCandidates = toOrderAmountCandidates(txAmtRaw);
-              const candidate = (await dataSource.query(
-                `SELECT "id", "userId", "productId", "amount", "status", "createdAt"
-                 FROM "orders"
-                 WHERE "userId" = $1 AND ABS("amount" - $2::numeric) < 0.01 AND "status" = 'pending'
-                 ORDER BY "createdAt" DESC
-                 LIMIT 1`,
-                [user.id, userAmountCandidates[0] || txAmtRaw]
-              )) as Array<OrderRow>;
-              if (candidate.length > 0) order = candidate[0];
-            }
-          }
-
-          // Fallback: match by amount + recent time window (30 minutes)
-          if (!order) {
-            const txAmount = (transaction as any).amount || (transaction as any).transaction_amount || 0; // likely in cents
-            const amountCandidates = toOrderAmountCandidates(txAmount);
-
-            const txDate = transaction.createdAt ? new Date(transaction.createdAt) : (transaction as any).approvedAt ? new Date((transaction as any).approvedAt) : new Date();
-            const earliest = new Date(txDate.getTime() - 30 * 60 * 1000);
-            const latest = new Date(txDate.getTime() + 30 * 60 * 1000);
-
-            for (const amt of amountCandidates) {
-              const candidates = (await dataSource.query(
-                `SELECT "id", "userId", "productId", "amount", "status", "createdAt"
-                 FROM "orders"
-                 WHERE ABS("amount" - $1::numeric) < 0.01 AND "status" = 'pending'
-                 ORDER BY "createdAt" DESC`,
-                [amt]
-              )) as Array<OrderRow>;
-              if (candidates && candidates.length > 0) {
-                const match = candidates.find((c) => {
-                  const created = new Date(c.createdAt);
-                  return created >= earliest && created <= latest;
-                });
-                if (match) {
-                  order = match;
-                  break;
-                }
-              }
-            }
-          }
-        }
+      const transaction = req.body as any;
+      const order = await findOrderForWebhook(dataSource, transaction, transactionId);
 
         if (!order) {
           return res.status(200).json({ ok: true, ignored: true });
@@ -257,9 +264,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           status: transaction.status,
           rawPayload: transaction,
         });
-      } else {
-        return res.status(200).json({ ok: true, ignored: true });
-      }
+    } else if (checkoutId && payment.provider !== "infinitepay") {
+      payment.provider = "infinitepay";
     }
 
     const { order } = await loadOrderById(dataSource, payment.orderId);
