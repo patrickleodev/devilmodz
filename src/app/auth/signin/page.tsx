@@ -1,8 +1,3 @@
-"use client";
-
-import { signIn } from "next-auth/react";
-import { useSearchParams } from "next/navigation";
-
 const errorMessages: Record<string, string> = {
   AccessDenied: "Seu acesso foi negado durante a autenticação.",
   Callback: "Houve um problema ao concluir o retorno do Discord.",
@@ -12,10 +7,20 @@ const errorMessages: Record<string, string> = {
   Default: "Não foi possível entrar no momento.",
 };
 
-export default function SignInPage() {
-  const searchParams = useSearchParams();
-  const callbackUrl = searchParams?.get("callbackUrl") || "/";
-  const error = searchParams?.get("error") || "";
+import SignInClient from "./sign-in-client";
+
+type SignInPageProps = {
+  searchParams?: {
+    callbackUrl?: string | string[];
+    error?: string | string[];
+  };
+};
+
+export default function SignInPage({ searchParams }: SignInPageProps) {
+  const callbackUrl = Array.isArray(searchParams?.callbackUrl)
+    ? searchParams.callbackUrl[0]
+    : searchParams?.callbackUrl || "/";
+  const error = Array.isArray(searchParams?.error) ? searchParams.error[0] : searchParams?.error || "";
   const message = errorMessages[error] || errorMessages.Default;
 
   return (
@@ -25,13 +30,7 @@ export default function SignInPage() {
         <h1 className="mt-3 text-3xl font-semibold text-white">Entrar com Discord</h1>
         <p className="mt-4 text-sm leading-6 text-slate-300">{message}</p>
 
-        <button
-          type="button"
-          onClick={() => signIn("discord", { callbackUrl })}
-          className="mt-8 inline-flex w-full items-center justify-center rounded-2xl bg-gradient-to-r from-cyan-400 to-emerald-400 px-5 py-3 font-semibold text-slate-950 transition hover:brightness-110"
-        >
-          Continuar com Discord
-        </button>
+        <SignInClient callbackUrl={callbackUrl} />
       </section>
     </main>
   );
