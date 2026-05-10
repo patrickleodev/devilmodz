@@ -217,8 +217,13 @@ export const createOrderTicketThread = async (input: {
       console.log("[Discord] Criando canal de texto privado...");
 
       const guildId = getGuildId();
-        console.log("[Discord] Guild ID:", guildId);
-        
+      console.log("[Discord] Guild ID:", guildId);
+      
+      if (!guildId) {
+        console.error("[Discord] ERRO: DISCORD_GUILD_ID é obrigatório quando usando Text Channel para tickets. Configure a variável de ambiente DISCORD_GUILD_ID.");
+        return null;
+      }
+      
       const botUserId = await getBotUserId();
       const permissionOverwrites: DiscordOverwrite[] = [
         {
