@@ -33,6 +33,25 @@ export const ensureDataSource = async () => {
     await AppDataSource.initialize();
   }
 
+  const [amountColumn] = (await AppDataSource.query(
+    `
+    SELECT data_type
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'orders'
+      AND column_name = 'amount'
+    LIMIT 1
+    `
+  )) as Array<{ data_type?: string }>;
+
+  if (amountColumn?.data_type === "integer" || amountColumn?.data_type === "smallint" || amountColumn?.data_type === "bigint") {
+    await AppDataSource.query(
+      `ALTER TABLE "orders"
+       ALTER COLUMN "amount" TYPE numeric(10,2)
+       USING "amount"::numeric(10,2)`
+    );
+  }
+
   const productRepository = AppDataSource.getRepository(Product);
   const existingProducts = await productRepository.find();
 

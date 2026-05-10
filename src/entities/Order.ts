@@ -1,5 +1,10 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn } from "typeorm";
 
+const numericTransformer = {
+  to: (value: number) => value,
+  from: (value: string | number | null) => (value === null ? value : Number(value)),
+};
+
 @Entity("orders")
 export class Order {
   @PrimaryGeneratedColumn("uuid")
@@ -11,7 +16,7 @@ export class Order {
   @Column({ type: "uuid" })
   productId!: string;
 
-  @Column("integer")
+  @Column({ type: "numeric", precision: 10, scale: 2, transformer: numericTransformer })
   amount!: number;
 
   @Column({ type: "text", default: "pending" })
