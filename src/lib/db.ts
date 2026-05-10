@@ -52,6 +52,25 @@ export const ensureDataSource = async () => {
     );
   }
 
+  const [priceColumn] = (await AppDataSource.query(
+    `
+    SELECT data_type
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'products'
+      AND column_name = 'price'
+    LIMIT 1
+    `
+  )) as Array<{ data_type?: string }>;
+
+  if (priceColumn?.data_type === "integer" || priceColumn?.data_type === "smallint" || priceColumn?.data_type === "bigint") {
+    await AppDataSource.query(
+      `ALTER TABLE "products"
+       ALTER COLUMN "price" TYPE numeric(10,2)
+       USING "price"::numeric(10,2)`
+    );
+  }
+
   const productRepository = AppDataSource.getRepository(Product);
   const existingProducts = await productRepository.find();
 
