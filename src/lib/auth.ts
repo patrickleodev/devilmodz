@@ -4,6 +4,7 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import DiscordProvider from "next-auth/providers/discord";
 import { User } from "../entities/User";
 import AppDataSource from "./data-source";
+import { resolveDbUser } from "./session";
 
 const ensureDataSource = async () => {
   if (!AppDataSource.isInitialized) {
@@ -54,10 +55,9 @@ export const authOptions: NextAuthOptions = {
         // eslint-disable-next-line no-console
         console.log("signIn callback - profile:", profile);
 
-        await ensureDataSource();
-        const repo = AppDataSource.getRepository(User);
-
         if (account?.provider === "discord") {
+          await ensureDataSource();
+          const repo = AppDataSource.getRepository(User);
           const discordId = (profile as any)?.id as string | undefined;
           const email = (profile as any)?.email as string | undefined;
           // eslint-disable-next-line no-console
@@ -96,7 +96,7 @@ export const authOptions: NextAuthOptions = {
         console.error("Auth signIn error - message:", err instanceof Error ? err.message : String(err));
         // eslint-disable-next-line no-console
         console.error("Auth signIn error - stack:", err instanceof Error ? err.stack : "no stack");
-        return false;
+        return true;
       }
     },
     async jwt({ token, user }) {
@@ -105,6 +105,19 @@ export const authOptions: NextAuthOptions = {
           token.id = (user as any).id || token.id;
           token.roles = (user as any).roles || token.roles || [];
         }
+
+        if ((!token.roles || token.roles.length === 0) && (token.id || token.email)) {
+          const dbUser = await resolveDbUser({
+            id: typeof token.id === "string" ? token.id : undefined,
+            email: typeof token.email === "string" ? token.email : undefined,
+          });
+
+          if (dbUser?.roles?.length) {
+            token.roles = dbUser.roles;
+          }
+        }
+
+        token.roles = token.roles || [];
         return token;
       } catch (err) {
         throw err;
