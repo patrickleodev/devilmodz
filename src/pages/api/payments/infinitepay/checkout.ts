@@ -2,7 +2,6 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "../../../../lib/auth";
 import { Product } from "../../../../entities/Product";
-import { Order } from "../../../../entities/Order";
 import { Payment } from "../../../../entities/Payment";
 import { ensureDataSource } from "../../../../lib/db";
 import { sendDiscordChannelMessage, buildOrderCreatedMessage } from "../../../../lib/discord";
@@ -53,7 +52,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     const dataSource = await ensureDataSource();
     const productRepository = dataSource.getRepository(Product);
-    const orderRepository = dataSource.getRepository(Order);
     const paymentRepository = dataSource.getRepository(Payment);
     const userRepository = dataSource.getRepository(User);
 
@@ -85,19 +83,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const amount = product.price * quantity;
-    const order = orderRepository.create({
-      userId: dbUser.id,
-      productId: product.id,
-      amount,
-      status: "pending",
-      mpPreferenceId: checkoutUrl,
-    });
+    const result = await dataSource.query(
+      `INSERT INTO "orders" ("userId", "productId", "amount", "status", "mpPreferenceId")
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING "id"`,
+      [dbUser.id, product.id, amount, "pending", checkoutUrl]
+    );
 
-    const savedOrder = await orderRepository.save(order);
+    const savedOrderId = result?.[0]?.id as string | undefined;
+
+    if (!savedOrderId) {
+      return res.status(500).json({ error: "Failed to create order" });
+    }
 
     await paymentRepository.save(
       paymentRepository.create({
-        orderId: savedOrder.id,
+        orderId: savedOrderId,
         provider: "infinitepay-link",
         providerPaymentId: selectedPlan?.id,
         status: "pending",
@@ -114,7 +115,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const mention = dbUser.discordId ? `<@${dbUser.discordId}>` : null;
       await sendDiscordChannelMessage(
         buildOrderCreatedMessage({
-          orderId: savedOrder.id,
+          orderId: savedOrderId,
           productTitle: product.title,
           amount,
           mention,
@@ -128,7 +129,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     return res.status(200).json({
-      orderId: savedOrder.id,
+      orderId: savedOrderId,
       checkoutUrl,
     });
   } catch (error) {
