@@ -5,7 +5,6 @@ import { ensureDataSource } from "../../../lib/db";
 import { Order } from "../../../entities/Order";
 import { Product } from "../../../entities/Product";
 import { Payment } from "../../../entities/Payment";
-import { User } from "../../../entities/User";
 import { resolveDbUser } from "../../../lib/session";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -16,10 +15,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     const ds = await ensureDataSource();
-    const orderRepo = ds.getRepository(Order);
     const productRepo = ds.getRepository(Product);
     const paymentRepo = ds.getRepository(Payment);
-    const userRepo = ds.getRepository(User);
 
     const dbUser = await resolveDbUser(sessionUser);
 
@@ -27,13 +24,62 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(404).json({ error: "User not found" });
     }
 
-    const orders = await orderRepo.find({ where: { userId: dbUser.id }, order: { createdAt: "DESC" } });
+    const [columnPresence] = (await ds.query(
+      `
+      SELECT
+        EXISTS (
+          SELECT 1
+          FROM information_schema.columns
+          WHERE table_schema = 'public'
+            AND table_name = 'orders'
+            AND column_name = 'discordThreadId'
+        ) AS "hasDiscordThreadId",
+        EXISTS (
+          SELECT 1
+          FROM information_schema.columns
+          WHERE table_schema = 'public'
+            AND table_name = 'orders'
+            AND column_name = 'discordThreadUrl'
+        ) AS "hasDiscordThreadUrl"
+      `
+    )) as Array<{ hasDiscordThreadId: boolean; hasDiscordThreadUrl: boolean }>;
+
+    const hasDiscordThreadId = Boolean(columnPresence?.hasDiscordThreadId);
+    const hasDiscordThreadUrl = Boolean(columnPresence?.hasDiscordThreadUrl);
+
+    const selectColumns = [
+      `"id"`,
+      `"userId"`,
+      `"productId"`,
+      `"amount"`,
+      `"status"`,
+      `"createdAt"`,
+    ];
+
+    if (hasDiscordThreadId) selectColumns.push(`"discordThreadId"`);
+    if (hasDiscordThreadUrl) selectColumns.push(`"discordThreadUrl"`);
+
+    const orders = (await ds.query(
+      `
+      SELECT ${selectColumns.join(", ")}
+      FROM "orders"
+      WHERE "userId" = $1
+      ORDER BY "createdAt" DESC
+      `,
+      [dbUser.id]
+    )) as Array<Order & { discordThreadId?: string | null; discordThreadUrl?: string | null }>;
 
     const detailed = await Promise.all(
       orders.map(async (o) => {
         const product = await productRepo.findOneBy({ id: o.productId });
         const payment = await paymentRepo.findOne({ where: { orderId: o.id } });
-        return { ...o, product, payment };
+        return {
+          ...o,
+          discordThreadId: o.discordThreadId || null,
+          discordThreadUrl: o.discordThreadUrl || null,
+          product,
+          payment,
+        };
       })
     );
 
