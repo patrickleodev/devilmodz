@@ -324,6 +324,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   } catch (error) {
     // eslint-disable-next-line no-console
     console.error("InfinitePay webhook error:", error);
+    try {
+      console.error('[InfinitePay webhook] request body:', JSON.stringify(req.body));
+      console.error('[InfinitePay webhook] transactionId:', transactionId, 'checkoutId:', checkoutId);
+    } catch (e) {
+      // ignore serialization errors
+    }
+
     return res.status(200).json({ ok: true }); // Always return 200 to prevent retries
   }
 }

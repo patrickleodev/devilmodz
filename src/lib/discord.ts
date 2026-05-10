@@ -145,7 +145,7 @@ export const createOrderTicketThread = async (input: {
   const channelId = getTicketChannelId();
 
   if (!channelId) {
-    console.log("[Discord] ERRO: DISCORD_TICKET_CHANNEL_ID não configurado");
+    console.error("[Discord] ERRO: DISCORD_TICKET_CHANNEL_ID não configurado. Check DISCORD_TICKET_CHANNEL_ID or DISCORD_NOTIFICATION_CHANNEL_ID env vars.");
     return null;
   }
 
@@ -195,7 +195,11 @@ export const createOrderTicketThread = async (input: {
     }
 
     if (clientId) {
-      await addThreadMember(thread.id, clientId);
+      try {
+        await addThreadMember(thread.id, clientId);
+      } catch (err) {
+        console.warn('[Discord] Falha ao adicionar cliente à thread (continuando):', err instanceof Error ? err.message : err);
+      }
     }
 
     const guildId = getGuildId();
@@ -292,13 +296,18 @@ export const createOrderTicketThread = async (input: {
     console.log("[Discord] Canal privado criado com sucesso:", ticketChannel.id);
 
     // Enviar mensagem no canal privado
-    const msg = (await createRestClient().post(Routes.channelMessages(ticketChannel.id), {
-      body: {
-        content: messageContent,
-      },
-    })) as { id?: string };
+    let msg: { id?: string } | null = null;
+    try {
+      msg = (await createRestClient().post(Routes.channelMessages(ticketChannel.id), {
+        body: {
+          content: messageContent,
+        },
+      })) as { id?: string };
 
-    console.log("[Discord] Mensagem enviada no canal privado:", msg.id);
+      console.log("[Discord] Mensagem enviada no canal privado:", msg.id);
+    } catch (err) {
+      console.error('[Discord] Erro ao enviar mensagem no canal privado:', err instanceof Error ? err.message : err);
+    }
 
     const threadUrl = guildId ? `https://discord.com/channels/${guildId}/${ticketChannel.id}` : null;
     console.log("[Discord] URL do ticket privado:", threadUrl);
