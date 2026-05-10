@@ -6,6 +6,7 @@ const getDiscordToken = () => process.env.DISCORD_BOT_TOKEN;
 const getNotificationChannelId = () => process.env.DISCORD_NOTIFICATION_CHANNEL_ID;
 const getTicketChannelId = () => process.env.DISCORD_TICKET_CHANNEL_ID || getNotificationChannelId();
 const getGuildId = () => process.env.DISCORD_GUILD_ID;
+const getStaffRoleId = () => process.env.DISCORD_STAFF_ROLE_ID;
 
 export const isDiscordNotificationsEnabled = () => {
   return Boolean(getDiscordToken() && getNotificationChannelId());
@@ -223,7 +224,7 @@ export const createOrderTicketThread = async (input: {
     const botUserId = await getBotUserId();
     const permissionOverwrites: DiscordOverwrite[] = [
       {
-        id: channelId,
+        id: guildId,
         type: 0,
         allow: "0",
         deny: PermissionFlagsBits.ViewChannel.toString(),
@@ -252,6 +253,23 @@ export const createOrderTicketThread = async (input: {
         deny: "0",
       },
     ];
+
+    const staffRoleId = getStaffRoleId();
+
+    if (staffRoleId) {
+      permissionOverwrites.push({
+        id: staffRoleId,
+        type: 0,
+        allow:
+          (
+            PermissionFlagsBits.ViewChannel |
+            PermissionFlagsBits.SendMessages |
+            PermissionFlagsBits.ReadMessageHistory |
+            PermissionFlagsBits.ManageMessages
+          ).toString(),
+        deny: "0",
+      });
+    }
 
     const ticketChannel = (await createRestClient().post(`/guilds/${guildId}/channels`, {
       body: {
