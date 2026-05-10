@@ -13,11 +13,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    if (process.env.DISCORD_INVITE_URL) {
-      return res.status(200).json({ inviteUrl: process.env.DISCORD_INVITE_URL });
-    }
-
-    return res.status(500).json({ error: "DISCORD_INVITE_URL is not configured" });
+    const inviteUrl = process.env.DISCORD_INVITE_URL || "https://discord.gg/SPeX5P4buB";
+    return res.status(200).json({ inviteUrl });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unexpected error";
     return res.status(500).json({ error: message });

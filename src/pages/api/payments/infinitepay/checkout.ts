@@ -82,7 +82,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: "Checkout link is not configured for this plan" });
     }
 
-    const amount = product.price * quantity;
+    const selectedCatalogPlan = storeProducts.find((plan) => plan.name === product.title || plan.id === productId);
+    const unitPrice = selectedCatalogPlan?.price ?? product.price;
+    const amount = unitPrice * quantity;
     const result = await dataSource.query(
       `INSERT INTO "orders" ("userId", "productId", "amount", "status", "mpPreferenceId")
        VALUES ($1, $2, $3, $4, $5)

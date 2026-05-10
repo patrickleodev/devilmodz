@@ -10,6 +10,7 @@ import { createMercadoPagoPreference, getAppBaseUrl, getMercadoPagoCheckoutMode,
 import { sendDiscordChannelMessage, buildOrderCreatedMessage } from "../../../lib/discord";
 import { User } from "../../../entities/User";
 import { resolveDbUser } from "../../../lib/session";
+import { products as storeProducts } from "../../../lib/products";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   res.setHeader('Cache-Control', 'no-store');
@@ -43,14 +44,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     for (const it of items) {
       const product = await productRepo.findOneBy({ id: it.productId });
       if (!product) continue;
-      const amount = product.price * it.quantity;
+      const selectedCatalogPlan = storeProducts.find((plan) => plan.name === product.title || plan.id === product.id);
+      const unitPrice = selectedCatalogPlan?.price ?? product.price;
+      const amount = unitPrice * it.quantity;
       total += amount;
 
       const order = orderRepo.create({ userId: dbUser.id, productId: product.id, amount, status: "pending" });
       const saved = await orderRepo.save(order);
       createdOrders.push(saved.id);
 
-      mpItems.push({ id: product.id, title: product.title, quantity: it.quantity, unit_price: product.price, currency_id: "BRL" });
+      mpItems.push({ id: product.id, title: product.title, quantity: it.quantity, unit_price: unitPrice, currency_id: "BRL" });
     }
 
     if (mpItems.length === 0) return res.status(400).json({ error: "No valid products in cart" });

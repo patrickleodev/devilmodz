@@ -8,6 +8,7 @@ import { createMercadoPagoPreference, getAppBaseUrl, getMercadoPagoCheckoutMode,
 import { ensureDataSource } from "../../../../lib/db";
 import { sendDiscordChannelMessage, buildOrderCreatedMessage } from "../../../../lib/discord";
 import { User } from "../../../../entities/User";
+import { products as storeProducts } from "../../../../lib/products";
 
 type CheckoutBody = {
   productId?: string;
@@ -75,7 +76,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(404).json({ error: "Product not found" });
     }
 
-    const amount = product.price * quantity;
+    const selectedCatalogPlan = storeProducts.find((plan) => plan.name === product.title || plan.id === productId);
+    const unitPrice = selectedCatalogPlan?.price ?? product.price;
+    const amount = unitPrice * quantity;
     const order = orderRepository.create({
       userId: dbUser.id,
       productId: product.id,
@@ -100,7 +103,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           id: product.id,
           title: product.title,
           quantity,
-          unit_price: product.price,
+          unit_price: unitPrice,
           currency_id: "BRL",
         },
       ],

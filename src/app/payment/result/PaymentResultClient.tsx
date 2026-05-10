@@ -113,6 +113,11 @@ export default function PaymentResultClient() {
     return order.status || order.payment?.status || "pending";
   }, [order]);
 
+  const money = useMemo(
+    () => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }),
+    []
+  );
+
   return (
     <main className="mx-auto min-h-screen max-w-3xl px-4 py-10">
       <div className="rounded-2xl border border-white/10 bg-white/5 p-8 shadow-2xl shadow-black/30">
@@ -128,7 +133,7 @@ export default function PaymentResultClient() {
           ) : order ? (
             <div>
               <p className="text-sm text-slate-400">Pedido: {order.id}</p>
-              <p className="text-sm text-slate-400">Valor: R$ {order.amount}</p>
+              <p className="text-sm text-slate-400">Valor: {money.format(order.amount)}</p>
               <p className="text-sm text-slate-400">Produto: {order.product?.title || order.product?.name || order.productId}</p>
               <p className="mt-4 text-lg font-medium text-white">Status: {statusLabel}</p>
               {userName ? <p className="text-sm text-slate-400">Discord: {userName}</p> : null}
