@@ -2,9 +2,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "../../../../../lib/auth";
 import { ensureDataSource } from "../../../../../lib/db";
-import { Order } from "../../../../../entities/Order";
 import { Product } from "../../../../../entities/Product";
-import { User } from "../../../../../entities/User";
 import { createOrderTicketThread } from "../../../../../lib/discord";
 import { resolveDbUser } from "../../../../../lib/session";
 
@@ -24,7 +22,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     const ds = await ensureDataSource();
-    const userRepo = ds.getRepository(User);
 
     const dbUser = await resolveDbUser(sessionUser);
     if (!dbUser) return res.status(404).json({ error: "User not found" });
@@ -61,9 +58,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!ticket) return res.status(500).json({ error: "Failed to create ticket" });
 
     if (ticket.threadId) {
-      order.discordThreadId = ticket.threadId;
-      order.discordThreadUrl = ticket.threadUrl || undefined;
-      await orderRepo.save(order);
+      await ds.query(
+        `UPDATE "orders"
+         SET "discordThreadId" = $2,
+             "discordThreadUrl" = $3
+         WHERE "id" = $1`,
+        [id, ticket.threadId, ticket.threadUrl || null]
+      );
       return res.status(200).json({ threadUrl: ticket.threadUrl });
     }
 
