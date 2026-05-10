@@ -19,10 +19,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     const ds = await ensureDataSource();
-    const orderRepo = ds.getRepository(Order);
     const productRepo = ds.getRepository(Product);
     const paymentRepo = ds.getRepository(Payment);
-    const userRepo = ds.getRepository(User);
 
     const dbUser = await resolveDbUser(sessionUser);
 
@@ -30,7 +28,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(404).json({ error: "User not found" });
     }
 
-    const order = await orderRepo.findOneBy({ id });
+    const [order] = (await ds.query(
+      `SELECT "id", "userId", "productId", "amount", "status", "createdAt" FROM "orders" WHERE "id" = $1`,
+      [id]
+    )) as Array<Order>;
+    
     if (!order) return res.status(404).json({ error: "Order not found" });
     if (order.userId !== dbUser.id) return res.status(403).json({ error: "Forbidden" });
 

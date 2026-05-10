@@ -247,7 +247,7 @@ export default function AdminDashboard() {
                         <p className="mt-2 text-sm leading-6 text-slate-400">{product.description}</p>
                       </div>
                       <span className="rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-xs text-cyan-200">
-                        R$ {product.price}
+                        {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(product.price)}
                       </span>
                     </div>
                     <div className="mt-4 flex flex-wrap gap-2 text-xs text-slate-300">

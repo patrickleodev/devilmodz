@@ -11,6 +11,7 @@ export default function PlanosPage() {
   const [error, setError] = useState<string | null>(null);
 
   const isAuthenticated = Boolean(session?.user);
+  const money = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 
   const sessionLabel = useMemo(() => {
     if (status === "loading") return "Verificando sessão...";
@@ -130,7 +131,7 @@ export default function PlanosPage() {
               <div className="flex items-end justify-between gap-4">
                 <div>
                   <p className="text-xs uppercase tracking-[0.24em] text-slate-500">A partir de</p>
-                  <p className="mt-1 text-3xl font-semibold text-white">R$ {product.price}</p>
+                  <p className="mt-1 text-3xl font-semibold text-white">{money.format(product.price)}</p>
                 </div>
                 <button
                   disabled={pendingId === product.id}
