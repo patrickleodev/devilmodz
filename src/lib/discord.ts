@@ -277,21 +277,41 @@ export const createOrderTicketThread = async (input: {
         });
       }
 
-      const ticketChannel = (await createRestClient().post(`/guilds/${guildId}/channels`, {
-        body: {
+      let ticketChannel: { id?: string } | null = null;
+      try {
+        const payload = {
           name: `pedido-${input.orderId.slice(0, 8)}`,
           type: ChannelType.GuildText,
           permission_overwrites: permissionOverwrites,
           topic: `Ticket privado do pedido ${input.orderId}`,
-        },
-      })) as { id?: string };
+        };
 
-      if (!ticketChannel?.id) {
-        console.error("[Discord] ERRO: Canal privado não retornou ID");
+        console.log("[Discord] Payload para criação de canal privado:", JSON.stringify({ name: payload.name, type: payload.type, topic: payload.topic }));
+
+        ticketChannel = (await createRestClient().post(`/guilds/${guildId}/channels`, {
+          body: payload,
+        })) as { id?: string };
+
+        console.log("[Discord] Resposta criação de canal (raw):", ticketChannel);
+
+        if (!ticketChannel?.id) {
+          console.error("[Discord] ERRO: Canal privado não retornou ID");
+          return null;
+        }
+
+        console.log("[Discord] Canal privado criado com sucesso:", ticketChannel.id);
+      } catch (err) {
+        console.error('[Discord] Erro ao criar canal privado:', err instanceof Error ? err.message : err);
+        try {
+          // tenta extrair detalhes do erro quando possível
+          const json = JSON.parse(String(err instanceof Error ? err.message : String(err)));
+          console.error('[Discord] Detalhes do erro API:', json);
+        } catch (_) {
+          // ignore parse error
+        }
+
         return null;
       }
-
-      console.log("[Discord] Canal privado criado com sucesso:", ticketChannel.id);
 
       // Enviar mensagem no canal privado
       let msg: { id?: string } | null = null;
