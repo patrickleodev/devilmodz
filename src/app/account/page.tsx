@@ -240,7 +240,7 @@ export default function AccountPage() {
                         >
                           Abrir ticket no Discord
                         </a>
-                      ) : order.status === "completed" ? (
+                      ) : order.status === "completed" || order.status === "paid" ? (
                         <>
                           <button
                             onClick={() => openTicket(order.id)}
