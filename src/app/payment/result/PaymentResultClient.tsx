@@ -58,6 +58,21 @@ export default function PaymentResultClient() {
     }
   };
 
+  const openTicket = async (id: string) => {
+    try {
+      const res = await fetch(`/api/orders/${id}/ticket/open`, { method: "POST" });
+      const body = await res.json();
+
+      if (!res.ok) {
+        throw new Error(body.error || "Falha ao abrir ticket");
+      }
+
+      setOrder((current) => (current ? { ...current, discordThreadUrl: body.threadUrl } : current));
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Erro ao abrir ticket");
+    }
+  };
+
   useEffect(() => {
     // parse orderId from URL on client side
     if (typeof window !== "undefined") {
@@ -148,6 +163,13 @@ export default function PaymentResultClient() {
                   >
                     Abrir ticket no Discord
                   </a>
+                ) : order.status === "paid" || order.status === "completed" ? (
+                  <button
+                    onClick={() => order?.id && openTicket(order.id)}
+                    className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-cyan-400 to-emerald-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:brightness-110"
+                  >
+                    Abrir ticket no Discord
+                  </button>
                 ) : null}
                 {inviteUrl ? (
                   <a
