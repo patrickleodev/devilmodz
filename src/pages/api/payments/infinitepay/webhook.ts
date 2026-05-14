@@ -277,11 +277,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Update payment status based on InfinitePay transaction status
     const newStatus = mapInfinitePayStatusToOrderStatus(payment.status || "");
 
+    console.log("[InfinitePay Webhook] Mapped payment status:", payment.status, "->", newStatus);
+
     payment.status = newStatus;
     payment.rawPayload = { ...payment.rawPayload, ...req.body };
 
     if (newStatus === "paid" || newStatus === "completed") {
       console.log("[InfinitePay Webhook] Pagamento confirmado para ordem:", order.id);
+      console.log("[InfinitePay Webhook] Order status:", order.status, "Order discordThreadId:", order.discordThreadId);
       payment.confirmedAt = payment.confirmedAt || new Date();
 
       if (!order.discordThreadId) {
@@ -292,6 +295,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             userRepository.findOneBy({ id: order.userId }),
           ]);
 
+          console.log("[InfinitePay Webhook] Product found:", product?.title, "User found:", dbUser?.email);
+          console.log("[InfinitePay Webhook] Calling createOrderTicketThread with:", {
+            orderId: order.id,
+            productTitle: product?.title || "Unknown Product",
+            amount: order.amount,
+            mention: dbUser?.discordId ? `<@${dbUser.discordId}>` : null,
+            userEmail: dbUser?.email || null,
+            providerLabel: "InfinitePay",
+          });
+
           const ticket = await createOrderTicketThread({
             orderId: order.id,
             productTitle: product?.title || "Unknown Product",
@@ -301,21 +314,36 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             providerLabel: "InfinitePay",
           });
 
+          console.log("[InfinitePay Webhook] Ticket creation result:", ticket);
+
           if (ticket?.threadId) {
+            console.log("[InfinitePay Webhook] Ticket created successfully, updating order status");
             await updateOrderStatus(dataSource, order.id, "completed", ticket);
           } else {
+            console.log("[InfinitePay Webhook] Ticket is null/no threadId, updating order to completed anyway");
             await updateOrderStatus(dataSource, order.id, "completed");
           }
         } catch (notifyErr) {
           // eslint-disable-next-line no-console
-          console.error("Discord ticket creation failed:", notifyErr instanceof Error ? notifyErr.message : notifyErr);
+          console.error("[InfinitePay Webhook] ERROR - Discord ticket creation failed:", notifyErr instanceof Error ? notifyErr.message : String(notifyErr));
+          console.error("[InfinitePay Webhook] Stack:", notifyErr instanceof Error ? notifyErr.stack : "No stack");
+          // Still update order status to completed, but without ticket
+          try {
+            await updateOrderStatus(dataSource, order.id, "completed");
+            console.log("[InfinitePay Webhook] Updated order to completed despite ticket error");
+          } catch (updateErr) {
+            console.error("[InfinitePay Webhook] Failed to update order status:", updateErr instanceof Error ? updateErr.message : String(updateErr));
+          }
         }
       } else {
+        console.log("[InfinitePay Webhook] Order already has discordThreadId:", order.discordThreadId, "- skipping ticket creation");
         await updateOrderStatus(dataSource, order.id, "completed", {
           threadId: order.discordThreadId,
           threadUrl: order.discordThreadUrl || undefined,
         });
       }
+    } else {
+      console.log("[InfinitePay Webhook] Payment status is not paid/completed, skipping ticket creation. Status:", newStatus);
     }
 
     await paymentRepository.save(payment);
