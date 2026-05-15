@@ -4,8 +4,10 @@ WORKDIR /app
 ENV NODE_ENV=production
 
 # Instala dependências
+
+# Instala dependências (incluindo devDependencies para o build)
 COPY package.json package-lock.json* ./
-RUN if [ -f package-lock.json ]; then npm ci --omit=dev; else npm install --omit=dev; fi
+RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
 
 # Copia apenas o necessário para rodar o bot
 COPY src/bot ./src/bot
@@ -15,6 +17,11 @@ COPY src/lib ./src/lib
 # Adicione:
 COPY tsconfig.json ./
 
+
+# Compila o bot
 RUN npm run build:bot
+
+# Remove devDependencies para imagem final menor (opcional)
+RUN npm prune --production
 
 CMD ["node", "dist/bot/index.js"]
