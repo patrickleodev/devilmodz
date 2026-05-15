@@ -18,6 +18,7 @@
     "@discordjs/rest": "^2.4.0",
     "@supabase/ssr": "^0.10.2",
     "@supabase/supabase-js": "^2.105.3",
+    "@vercel/analytics": "^2.0.1",
     "bcrypt": "^6.0.0",
     "bcryptjs": "^2.4.3",
     "discord-api-types": "^0.38.32",
