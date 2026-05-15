@@ -204,6 +204,7 @@ const findOrderForWebhook = async (
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   console.log("[InfinitePay Webhook] Recebido request:", req.method);
+  console.log("[InfinitePay Webhook] Body completo:", JSON.stringify(req.body, null, 2));
   
   if (req.method === "GET") {
     return res.status(200).json({ ok: true });
