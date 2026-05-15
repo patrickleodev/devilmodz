@@ -64,12 +64,12 @@ export default function PaymentResultClient() {
       const body = await res.json();
 
       if (!res.ok) {
-        throw new Error(body.error || "Falha ao abrir ticket");
+        throw new Error(body.error || "Falha ao acessar ticket");
       }
 
       setOrder((current) => (current ? { ...current, discordThreadUrl: body.threadUrl } : current));
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Erro ao abrir ticket");
+      alert(err instanceof Error ? err.message : "Erro ao acessar ticket");
     }
   };
 
@@ -138,7 +138,7 @@ export default function PaymentResultClient() {
       <div className="rounded-2xl border border-white/10 bg-white/5 p-8 shadow-2xl shadow-black/30">
         <p className="text-xs uppercase tracking-[0.3em] text-cyan-200">Pagamento confirmado</p>
         <h1 className="mt-3 text-2xl font-semibold text-white sm:text-3xl">Seu acesso já está liberado.</h1>
-        <p className="mt-3 text-sm text-slate-300">Entre no servidor do Discord e, quando estiver dentro, clique em “Já entrei” para voltar aos planos.</p>
+        <p className="mt-3 text-sm text-slate-300">Entre no servidor do Discord e, quando estiver dentro, clique em "Já entrei" para voltar aos planos.</p>
 
         <div className="mt-6 space-y-3">
           {loading ? (
@@ -161,14 +161,14 @@ export default function PaymentResultClient() {
                     rel="noreferrer"
                     className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-cyan-400 to-emerald-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:brightness-110"
                   >
-                    Abrir ticket no Discord
+                    Acessar ticket no Discord
                   </a>
                 ) : order.status === "paid" || order.status === "completed" ? (
                   <button
                     onClick={() => order?.id && openTicket(order.id)}
                     className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-cyan-400 to-emerald-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:brightness-110"
                   >
-                    Abrir ticket no Discord
+                    Acessar ticket
                   </button>
                 ) : null}
                 {inviteUrl ? (
