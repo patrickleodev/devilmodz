@@ -126,6 +126,24 @@ export const fetchInfinitePayTransaction = async (transactionId: string) => {
   return infinitePayRequest<InfinitePayTransactionResponse>(`/v1/transactions/${transactionId}`);
 };
 
+// New: create a public checkout link using InfinitePay External Checkout
+export const createCheckoutLink = async (payload: Record<string, unknown>) => {
+  const url = "https://api.checkout.infinitepay.io/links";
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`InfinitePay Links API error (${response.status}): ${body}`);
+  }
+
+  return response.json();
+};
+
 export const refundInfinitePayTransaction = async (transactionId: string, amount?: number) => {
   return infinitePayRequest<{ id: string; status: string }>(`/v1/transactions/${transactionId}/refund`, {
     method: "POST",
