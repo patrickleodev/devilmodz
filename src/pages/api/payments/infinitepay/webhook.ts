@@ -263,11 +263,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           return res.status(200).json({ ok: true, ignored: true });
         }
 
+        // InfinitePay doesn't send explicit status, so infer from paid_amount === amount
+        const inferredStatus = (transaction.paid_amount === transaction.amount) ? "completed" : "pending";
+
         payment = paymentRepository.create({
           orderId: order.id,
           provider: "infinitepay",
           providerPaymentId: transactionId ?? undefined,
-          status: transaction.status,
+          status: inferredStatus,
           rawPayload: transaction,
         } as Partial<Payment>);
     } else if (checkoutId && payment.provider !== "infinitepay") {
@@ -282,7 +285,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Update payment status based on InfinitePay transaction status
-    const newStatus = mapInfinitePayStatusToOrderStatus(payment.status || "");
+    // If payment.status wasn't set above, infer from amount match
+    const newStatus = mapInfinitePayStatusToOrderStatus(payment.status || (req.body.paid_amount === req.body.amount ? "completed" : "pending"));
 
     console.log("[InfinitePay Webhook] Mapped payment status:", payment.status, "->", newStatus);
 
