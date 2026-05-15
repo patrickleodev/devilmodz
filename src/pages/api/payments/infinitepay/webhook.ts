@@ -254,6 +254,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const order = await findOrderForWebhook(dataSource, transaction, transactionId);
 
         if (!order) {
+          console.log("[InfinitePay Webhook] Unable to match order for incoming payload. Payload:", JSON.stringify(transaction));
           return res.status(200).json({ ok: true, ignored: true });
         }
 
@@ -271,6 +272,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const { order } = await loadOrderById(dataSource, payment.orderId);
 
     if (!order) {
+      console.log("[InfinitePay Webhook] Payment references missing orderId:", payment.orderId, "payment raw payload:", JSON.stringify(payment.rawPayload));
       return res.status(200).json({ ok: true, ignored: true });
     }
 
