@@ -12,7 +12,9 @@ COPY src/bot ./src/bot
 COPY src/entities ./src/entities
 COPY src/lib ./src/lib
 
-# Instala o tsx globalmente (garante que estará disponível)
-RUN npm install -g tsx
+# Adicione:
+COPY tsconfig.json ./
 
-CMD ["tsx", "src/bot/index.ts"]
+RUN npm run build
+
+CMD ["node", "dist/bot/index.js"]

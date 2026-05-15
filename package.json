@@ -11,7 +11,7 @@
     "docker": "docker compose up --build",
     "db": "docker compose up -d db",
     "web": "docker compose up --build app",
-    "bot": "tsx src/bot/index.ts",
+    "bot": "node dist/bot/index.js",
     "verify-env": "node scripts/validate-env.mjs"
   },
   "dependencies": {
