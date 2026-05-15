@@ -16,6 +16,7 @@
     "verify-env": "node scripts/validate-env.mjs"
   },
   "dependencies": {
+    "typescript": "^5.0.0",
     "tsx": "^4.7.0",
     "@discordjs/rest": "^2.4.0",
     "@supabase/ssr": "^0.10.2",
