@@ -108,8 +108,12 @@ const updateOrderStatus = async (
 const getTransactionIdFromRequest = (req: NextApiRequest) => {
   // InfinitePay sends transaction ID in different ways depending on webhook type
   const body = req.body as
-    | { transactionId?: string; transaction_id?: string; data?: { id?: string } }
+    | { transactionId?: string; transaction_id?: string; transaction_nsu?: string; data?: { id?: string } }
     | undefined;
+
+  if (body?.transaction_nsu) {
+    return body.transaction_nsu;
+  }
 
   if (body?.transactionId) {
     return body.transactionId;
@@ -127,9 +131,9 @@ const getTransactionIdFromRequest = (req: NextApiRequest) => {
 };
 
 const getCheckoutIdFromRequest = (req: NextApiRequest) => {
-  const body = req.body as { checkoutId?: string; checkout_id?: string } | undefined;
+  const body = req.body as { checkoutId?: string; checkout_id?: string; order_nsu?: string } | undefined;
 
-  return body?.checkoutId || body?.checkout_id || null;
+  return body?.order_nsu || body?.checkoutId || body?.checkout_id || null;
 };
 
 const findOrderForWebhook = async (
