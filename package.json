@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:bot": "tsc",
     "start": "next start",
     "lint": "eslint",
     "clean-db": "node scripts/clean-database.mjs",
