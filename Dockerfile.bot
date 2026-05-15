@@ -11,7 +11,6 @@ RUN if [ -f package-lock.json ]; then npm ci --omit=dev; else npm install --omit
 COPY src/bot ./src/bot
 COPY src/entities ./src/entities
 COPY src/lib ./src/lib
-COPY .env.production.local ./
 
 # Instala o tsx globalmente (garante que estará disponível)
 RUN npm install -g tsx
