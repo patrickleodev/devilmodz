@@ -17,6 +17,8 @@ COPY src/lib ./src/lib
 # Adicione:
 COPY tsconfig.json ./
 
+# Instala TypeScript globalmente para compilar o bot
+RUN npm install -g typescript
 
 # Compila o bot
 RUN npm run build:bot
