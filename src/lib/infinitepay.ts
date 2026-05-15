@@ -1,3 +1,4 @@
+export { createCustomInfinitePayCheckout } from "./createCustomInfinitePayCheckout";
 type InfinitePayItem = {
   name: string;
   quantity: number;
@@ -47,17 +48,23 @@ export const getAppBaseUrl = () => {
 };
 
 export const getInfinitePayCheckoutMode = (): InfinitePayCheckoutMode => {
-  const configuredMode = process.env.INFINITEPAY_MODE?.toLowerCase();
+  // Normalize value: remove surrounding quotes and whitespace, then lowercase
+  const raw = process.env.INFINITEPAY_MODE;
+  const configuredMode = raw ? raw.replace(/^"|"$/g, "").trim().toLowerCase() : undefined;
 
   if (configuredMode === "sandbox" || configuredMode === "production") {
+    console.log(`INFINITEPAY_MODE (normalized) = ${configuredMode}`);
     return configuredMode;
   }
 
-  return process.env.NODE_ENV === "production" ? "production" : "sandbox";
+  const fallback = process.env.NODE_ENV === "production" ? "production" : "sandbox";
+  console.log(`INFINITEPAY_MODE not set or invalid (raw=${raw}). Falling back to NODE_ENV => ${fallback}`);
+  return fallback;
 };
 
 const getApiBaseUrl = () => {
   const mode = getInfinitePayCheckoutMode();
+  console.log(`Using InfinitePay API mode: ${mode}`);
   return mode === "sandbox"
     ? "https://api-sandbox.infinitepay.io"
     : "https://api.infinitepay.io";
