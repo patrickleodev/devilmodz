@@ -7,7 +7,6 @@ import { ensureDataSource } from "../../../../lib/db";
 import { sendDiscordChannelMessage, buildOrderCreatedMessage } from "../../../../lib/discord";
 import { User } from "../../../../entities/User";
 import { products as storeProducts } from "../../../../lib/products";
-import { createInfinitePayCheckout, getAppBaseUrl } from "../../../../lib/infinitepay";
 
 type CheckoutBody = {
   productId?: string;
@@ -99,47 +98,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(500).json({ error: "Failed to create order" });
     }
 
-    // Create InfinitePay checkout session with webhook notification
-    const appBaseUrl = getAppBaseUrl();
-    const webhookUrl = `${appBaseUrl}/api/payments/infinitepay/webhook`;
-    
-    let infinitePayCheckout;
-    try {
-      infinitePayCheckout = await createInfinitePayCheckout({
-        externalReference: savedOrderId,
-        notificationUrl: webhookUrl,
-        items: [
-          {
-            name: product.title,
-            quantity,
-            price: unitPrice,
-          },
-        ],
-        payerEmail: dbUser.email || undefined,
-        payerName: dbUser.email || undefined,
-        metadata: {
-          orderId: savedOrderId,
-          userId: dbUser.id,
-        },
-      });
-    } catch (checkoutErr) {
-      console.error("[InfinitePay Checkout] Error creating checkout session:", checkoutErr);
-      return res.status(500).json({
-        error: checkoutErr instanceof Error ? checkoutErr.message : "Failed to create checkout session",
-      });
-    }
-
     await paymentRepository.save(
       paymentRepository.create({
         orderId: savedOrderId,
         provider: "infinitepay",
-        providerPaymentId: infinitePayCheckout.id,
+        providerPaymentId: checkoutUrl,
         status: "pending",
         rawPayload: {
-          checkoutId: infinitePayCheckout.id,
-          checkoutUrl: infinitePayCheckout.url,
+          checkoutUrl,
           planId: selectedPlan?.id,
-          source: "dynamic-checkout",
+          source: "static-checkout",
         },
       })
     );
@@ -164,7 +132,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     return res.status(200).json({
       orderId: savedOrderId,
-      checkoutUrl: infinitePayCheckout.url,
+      checkoutUrl,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unexpected error";
