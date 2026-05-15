@@ -238,7 +238,7 @@ export default function AccountPage() {
                           rel="noreferrer"
                           className="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/10"
                         >
-                          Abrir ticket no Discord
+                          Acessar ticket no Discord
                         </a>
                       ) : order.status === "completed" || order.status === "paid" ? (
                         <>
@@ -246,7 +246,7 @@ export default function AccountPage() {
                             onClick={() => openTicket(order.id)}
                             className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-cyan-400 to-emerald-400 px-4 py-2.5 text-sm font-semibold text-slate-950 transition hover:brightness-110"
                           >
-                            Abrir ticket
+                            Acessar ticket
                           </button>
                           <span className="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-slate-300">
                             Ticket automático em processamento
