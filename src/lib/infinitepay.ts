@@ -32,14 +32,24 @@ type InfinitePayTransactionResponse = {
 
 type InfinitePayCheckoutMode = "sandbox" | "production";
 
-const getInfiniteTag = () => {
-  const tag = process.env.INFINITEPAY_TAG;
+const getInfinitePayApiKey = () => {
+  const key = process.env.INFINITEPAY_API_KEY;
 
-  if (!tag) {
-    throw new Error("INFINITEPAY_TAG is not configured");
+  if (!key) {
+    throw new Error("INFINITEPAY_API_KEY is not configured");
   }
 
-  return tag;
+  return key;
+};
+
+const getInfinitePayClientId = () => {
+  const clientId = process.env.INFINITEPAY_CLIENT_ID;
+
+  if (!clientId) {
+    throw new Error("INFINITEPAY_CLIENT_ID is not configured");
+  }
+
+  return clientId;
 };
 
 export const getAppBaseUrl = () => {
@@ -65,10 +75,15 @@ const getApiBaseUrl = () => {
 
 const infinitePayRequest = async <T>(path: string, init?: RequestInit): Promise<T> => {
   const baseUrl = getApiBaseUrl();
+  const apiKey = getInfinitePayApiKey();
+  const clientId = getInfinitePayClientId();
+  
   const response = await fetch(`${baseUrl}${path}`, {
     ...init,
     headers: {
       "Content-Type": "application/json",
+      "Authorization": `Bearer ${apiKey}`,
+      "X-Client-Id": clientId,
       ...(init?.headers || {}),
     },
   });
