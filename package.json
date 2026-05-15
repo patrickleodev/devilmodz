@@ -19,6 +19,7 @@
     "@supabase/ssr": "^0.10.2",
     "@supabase/supabase-js": "^2.105.3",
     "@vercel/analytics": "^2.0.1",
+    "@vercel/speed-insights": "^2.0.0",
     "bcrypt": "^6.0.0",
     "bcryptjs": "^2.4.3",
     "discord-api-types": "^0.38.32",
