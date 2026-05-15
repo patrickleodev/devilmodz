@@ -1,29 +1,29 @@
 # Dockerfile minimalista para rodar apenas o bot Discord
 FROM node:20-alpine AS base
 WORKDIR /app
-ENV NODE_ENV=production
 
 # Instala dependências
 
 # Instala dependências (incluindo devDependencies para o build)
 COPY package.json package-lock.json* ./
-RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
+RUN if [ -f package-lock.json ]; then npm ci --include=dev; else npm install; fi
 
 # Copia apenas o necessário para rodar o bot
 COPY src/bot ./src/bot
 COPY src/entities ./src/entities
 COPY src/lib ./src/lib
+COPY src/types ./src/types
 
 # Adicione:
 COPY tsconfig.json ./
-
-# Instala TypeScript globalmente para compilar o bot
-RUN npm install -g typescript
+COPY tsconfig.bot.json ./
 
 # Compila o bot
 RUN npm run build:bot
 
 # Remove devDependencies para imagem final menor (opcional)
-RUN npm prune --production
+RUN npm prune --omit=dev
+
+ENV NODE_ENV=production
 
 CMD ["node", "dist/bot/index.js"]
