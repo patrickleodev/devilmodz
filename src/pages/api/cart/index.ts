@@ -56,18 +56,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         if (!storeProduct) return res.status(400).json({ error: "Unknown product slug" });
 
         // Try to find existing DB product by title (best-effort)
-        let dbProduct = await productRepo.findOneBy({ title: storeProduct.name });
+        let dbProduct: Product | null = await productRepo.findOneBy({ title: storeProduct.name });
         if (!dbProduct) {
           // Create a lightweight product record in DB so we can reference it by UUID
-          dbProduct = productRepo.create({
+          const createdProduct = productRepo.create({
             title: storeProduct.name,
             description: storeProduct.description,
             price: storeProduct.price,
             stock: 0,
             deliveryType: "manual",
             tags: storeProduct.features || [],
-          } as any);
-          await productRepo.save(dbProduct);
+          } as Partial<Product>);
+          await productRepo.save(createdProduct);
+          dbProduct = createdProduct;
         }
 
         dbProductId = dbProduct.id;
