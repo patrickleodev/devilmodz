@@ -62,16 +62,46 @@ export default function Header() {
             />
             DEVIL MODZ
           </Link>
+          {/* Centered Navigation (desktop) */}
+          <nav className="hidden md:flex md:flex-1 md:justify-center">
+            <ul className="flex items-center gap-6">
+              <li>
+                <Link
+                  href="/"
+                  className="rounded-lg px-3 py-2 text-sm font-medium text-slate-300 transition hover:bg-white/5 hover:text-white"
+                >
+                  Início
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/planos"
+                  className="rounded-lg px-3 py-2 text-sm font-medium text-slate-300 transition hover:bg-white/5 hover:text-white"
+                >
+                  Planos
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/contas"
+                  className="rounded-lg px-3 py-2 text-sm font-medium text-slate-300 transition hover:bg-white/5 hover:text-white"
+                >
+                  Contas
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/termos"
+                  className="rounded-lg px-3 py-2 text-sm font-medium text-slate-300 transition hover:bg-white/5 hover:text-white"
+                >
+                  Termos
+                </Link>
+              </li>
+            </ul>
+          </nav>
 
-          {/* Desktop Navigation */}
+          {/* Right side controls */}
           <div className="hidden items-center gap-6 md:flex">
-            <Link
-              href="/planos"
-              className="rounded-lg px-3 py-2 text-sm font-medium text-slate-300 transition hover:bg-white/5 hover:text-white"
-            >
-              Planos
-            </Link>
-
             {/* Cart button */}
             <button
               onClick={() => { setMenuOpen(false); setCartOpen(true); }}
@@ -195,6 +225,24 @@ export default function Header() {
               >
                 <span className="text-base">📋</span>
                 <span>Planos</span>
+              </Link>
+
+              <Link
+                href="/contas"
+                className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-slate-300 hover:text-white hover:bg-white/5 transition"
+                onClick={() => setMenuOpen(false)}
+              >
+                <span className="text-base">🔒</span>
+                <span>Contas</span>
+              </Link>
+
+              <Link
+                href="/termos"
+                className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-slate-300 hover:text-white hover:bg-white/5 transition"
+                onClick={() => setMenuOpen(false)}
+              >
+                <span className="text-base">📜</span>
+                <span>Termos</span>
               </Link>
 
               <button
