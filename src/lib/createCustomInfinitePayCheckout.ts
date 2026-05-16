@@ -1,4 +1,4 @@
-import { createCheckoutLink, getAppBaseUrl } from "./infinitepay";
+import { createCheckoutLink, getAppBaseUrl, LinkResponse } from "./infinitepay";
 import { PLAN_OPTIONS as OPTIONS } from "./planosOptions";
 
 export async function createCustomInfinitePayCheckout(total: number, opcoes: string[]): Promise<string> {
@@ -31,7 +31,7 @@ export async function createCustomInfinitePayCheckout(total: number, opcoes: str
     // standard fields only
   };
 
-  const res = await createCheckoutLink(payload);
+  const res: LinkResponse = await createCheckoutLink(payload);
 
   // Response may contain a direct URL or a slug; try common fields
   if (res.url) return String(res.url);

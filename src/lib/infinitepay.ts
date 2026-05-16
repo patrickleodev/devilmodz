@@ -127,7 +127,15 @@ export const fetchInfinitePayTransaction = async (transactionId: string) => {
 };
 
 // New: create a public checkout link using InfinitePay External Checkout
-export const createCheckoutLink = async (payload: Record<string, unknown>) => {
+export type LinkResponse = {
+  url?: string;
+  link?: string;
+  checkout_url?: string;
+  slug?: string;
+  [k: string]: any;
+};
+
+export const createCheckoutLink = async (payload: Record<string, unknown>): Promise<LinkResponse> => {
   const url = "https://api.checkout.infinitepay.io/links";
 
   const response = await fetch(url, {
@@ -141,7 +149,7 @@ export const createCheckoutLink = async (payload: Record<string, unknown>) => {
     throw new Error(`InfinitePay Links API error (${response.status}): ${body}`);
   }
 
-  return response.json();
+  return response.json() as Promise<LinkResponse>;
 };
 
 export const refundInfinitePayTransaction = async (transactionId: string, amount?: number) => {
