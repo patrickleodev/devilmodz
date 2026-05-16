@@ -28,6 +28,7 @@ export async function createCustomInfinitePayCheckout(total: number, opcoes: str
     redirect_url: `${getAppBaseUrl()}/`,
     order_nsu: `custom-plan-${Date.now()}`,
     webhook_url: `${getAppBaseUrl()}/api/payments/infinitepay/webhook`,
+    // standard fields only
   };
 
   const res = await createCheckoutLink(payload);

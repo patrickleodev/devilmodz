@@ -17,7 +17,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "DEVIL MODZ",
-  description: "Loja premium de upagem de contas para GTA com checkout via Mercado Pago.",
+  description: "Loja premium de upagem de contas para GTA com checkout seguro.",
   icons: {
     icon: "/favicon.ico?v=1",
   },

@@ -6,7 +6,7 @@ import { CartItem } from "../../../entities/CartItem";
 import { Product } from "../../../entities/Product";
 import { Order } from "../../../entities/Order";
 import { Payment } from "../../../entities/Payment";
-import { createMercadoPagoPreference, getAppBaseUrl, getMercadoPagoCheckoutMode, getMercadoPagoCheckoutUrl } from "../../../lib/mercadopago";
+import { createCheckoutLink, getAppBaseUrl } from "../../../lib/infinitepay";
 import { sendDiscordChannelMessage, buildOrderCreatedMessage } from "../../../lib/discord";
 import { User } from "../../../entities/User";
 import { resolveDbUser } from "../../../lib/session";
@@ -58,49 +58,40 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (mpItems.length === 0) return res.status(400).json({ error: "No valid products in cart" });
 
-    const notificationUrl = `${getAppBaseUrl()}/api/payments/mercadopago/webhook`;
-    const preference = await createMercadoPagoPreference({
-      externalReference: createdOrders.join(","),
-      notificationUrl,
-      metadata: { orderIds: createdOrders, userId: dbUser.id },
-      payerEmail: session?.user?.email || undefined,
-      items: mpItems,
-    });
+    const notificationUrl = `${getAppBaseUrl()}/api/payments/infinitepay/webhook`;
 
-    // attach preference to first order
+    // Build InfinitePay items
+    const ipItems = mpItems.map((it) => ({ description: it.title, quantity: it.quantity, price: Math.round(it.unit_price * 100) }));
+
+    // Use Links API to create a hosted checkout link (more stable/public)
+    const handle = process.env.INFINITEPAY_TAG;
+    if (!handle) return res.status(500).json({ error: "INFINITEPAY_TAG not configured" });
+
+    const payload: Record<string, unknown> = {
+      handle,
+      items: ipItems,
+      order_nsu: createdOrders.join(","),
+      webhook_url: notificationUrl,
+      redirect_url: `${getAppBaseUrl()}/`,
+    };
+
+    const checkoutRes = await createCheckoutLink(payload);
+
+    // attach provider id to first order if available
     const firstOrderId = createdOrders[0];
     if (firstOrderId) {
       const first = await orderRepo.findOneBy({ id: firstOrderId });
       if (first) {
-        first.mpPreferenceId = preference.id;
+        first.mpPreferenceId = (checkoutRes as any).id || "";
         await orderRepo.save(first);
       }
     }
 
-    await paymentRepo.save(paymentRepo.create({ orderId: firstOrderId || "", provider: "mercadopago", providerPaymentId: preference.id, status: "pending", rawPayload: preference }));
+    await paymentRepo.save(paymentRepo.create({ orderId: firstOrderId || "", provider: "infinitepay", providerPaymentId: (checkoutRes as any).id || "", status: "pending", rawPayload: checkoutRes }));
 
-    // notify Discord channel about created orders (mention user if possible)
-    try {
-      const userRepo2 = ds.getRepository(User);
-      const dbUser2 = await userRepo2.findOneBy({ id: dbUser.id });
-      const mention = dbUser?.discordId ? `<@${dbUser.discordId}>` : null;
-      const firstProduct = mpItems[0];
-      await sendDiscordChannelMessage(
-        buildOrderCreatedMessage({ orderId: firstOrderId || "", productTitle: firstProduct?.title || "", amount: total, mention, userEmail: session?.user?.email || null })
-      );
-    } catch (notifyErr) {
-      // ignore notification errors
-      // eslint-disable-next-line no-console
-      console.warn("Discord notify failed:", notifyErr);
-    }
+    const paymentUrl = (checkoutRes as any).url || (checkoutRes as any).link || ((checkoutRes as any).slug ? `https://checkout.infinitepay.io/${handle}/${(checkoutRes as any).slug}` : undefined);
 
-    // clear cart
-    await Promise.all(items.map((it) => cartRepo.delete({ id: it.id } as any)));
-
-    const paymentUrl = getMercadoPagoCheckoutUrl(preference);
-    const checkoutMode = getMercadoPagoCheckoutMode();
-
-    return res.status(200).json({ orderIds: createdOrders, preferenceId: preference.id, paymentUrl, checkoutMode, initPoint: preference.init_point, sandboxInitPoint: preference.sandbox_init_point });
+    return res.status(200).json({ orderIds: createdOrders, provider: "infinitepay", paymentUrl, initPoint: paymentUrl });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unexpected error";
     return res.status(500).json({ error: message });

@@ -20,7 +20,7 @@ export default function PlanosPage() {
     return "Entre para comprar";
   }, [isAuthenticated, session?.user?.name, status]);
 
-  const handleCheckout = async (productId: string) => {
+  const handleAddToCart = async (productId: string) => {
     setError(null);
 
     if (!isAuthenticated) {
@@ -30,32 +30,24 @@ export default function PlanosPage() {
 
     try {
       setPendingId(productId);
-      const response = await fetch("/api/payments/infinitepay/checkout", {
+      const response = await fetch("/api/cart", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ productId, quantity: 1 }),
       });
 
-      const payload = (await response.json()) as {
-        error?: string;
-        checkoutUrl?: string;
-      };
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || "Falha ao adicionar ao carrinho");
 
-      if (!response.ok) {
-        throw new Error(payload.error || "Falha ao iniciar checkout");
+      // Open cart sidebar so user sees the item
+      try {
+        window.dispatchEvent(new Event("open_cart"));
+      } catch (e) {
+        /* ignore */
       }
-
-      const redirectUrl = payload.checkoutUrl;
-
-      if (!redirectUrl) {
-        throw new Error("InfinitePay não retornou a URL de pagamento");
-      }
-
-      window.location.href = redirectUrl;
-    } catch (checkoutError) {
-      setError(checkoutError instanceof Error ? checkoutError.message : "Erro inesperado");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
       setPendingId(null);
     }
   };
@@ -143,10 +135,10 @@ export default function PlanosPage() {
                 </div>
                 <button
                   disabled={pendingId === product.id}
-                  onClick={() => handleCheckout(product.id)}
+                  onClick={() => handleAddToCart(product.id)}
                   className="inline-flex w-full items-center justify-center rounded-2xl bg-gradient-to-r from-cyan-400 to-emerald-400 px-5 py-3 font-semibold text-slate-950 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
                 >
-                  {pendingId === product.id ? "Abrindo checkout..." : isAuthenticated ? "Comprar agora" : "Entrar e comprar"}
+                  {pendingId === product.id ? "Adicionando..." : isAuthenticated ? "Adicionar ao carrinho" : "Entrar e adicionar"}
                 </button>
               </div>
             </div>

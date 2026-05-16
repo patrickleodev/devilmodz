@@ -5,7 +5,7 @@ import { Order } from "../../../../entities/Order";
 import { Payment } from "../../../../entities/Payment";
 import { ensureDataSource } from "../../../../lib/db";
 import { isAdminRole } from "../../../../lib/admin";
-import { refundMercadoPagoPayment } from "../../../../lib/mercadopago";
+import { refundInfinitePayTransaction } from "../../../../lib/infinitepay";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const session = await getServerSession(req, res, authOptions);
@@ -34,13 +34,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const { status, action } = req.body as { status?: string; action?: string };
 
     if (action === "refund") {
-      const payment = await paymentRepository.findOneBy({ orderId: order.id, provider: "mercadopago" });
+      const payment = await paymentRepository.findOneBy({ orderId: order.id, provider: "infinitepay" });
 
       if (!payment?.providerPaymentId) {
         return res.status(400).json({ error: "Payment not found for refund" });
       }
 
-      await refundMercadoPagoPayment(payment.providerPaymentId);
+      await refundInfinitePayTransaction(payment.providerPaymentId);
       order.status = "refunded";
       payment.status = "refunded";
       await paymentRepository.save(payment);

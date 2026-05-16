@@ -29,15 +29,15 @@ export default function Home() {
                 Upagem premium com checkout seguro e acompanhamento em tempo real.
               </h1>
               <p className="max-w-2xl text-base leading-7 text-slate-300 sm:text-lg">
-                Acesse a aba de planos para ver os pacotes disponíveis e finalizar o pagamento pelo Mercado Pago.
-                O fluxo já está preparado para pedidos, pagamentos e futuras entregas via Discord.
+                Acesse a aba de planos para ver os pacotes disponíveis e finalizar o pagamento.
+                O fluxo já está preparado para pedidos, pagamentos e futuras integrações via Discord.
               </p>
             </div>
-
-            <div className="w-full rounded-3xl border border-white/10 bg-slate-950/70 p-5 text-sm text-slate-300 shadow-lg shadow-black/20 lg:max-w-sm">
-              <p className="text-xs uppercase tracking-[0.28em] text-slate-500">Status da conta</p>
-              <p className="mt-2 text-lg font-medium text-white">{sessionLabel}</p>
-              <p className="mt-2 max-w-xs text-sm leading-6 text-slate-400">
+              [
+              ["Planos", "Veja os pacotes disponíveis em uma aba separada e escolha com calma."],
+              ["Pagamento", "Checkout pronto com suporte a provedores configuráveis e webhooks."],
+              ["Login", "Autenticação com Discord e base pronta para credenciais administrativas."],
+            ].map(([title, description]) => (
                 {isAuthenticated
                   ? "Sua sessão está ativa. Veja os planos e siga para o checkout quando quiser."
                   : "Faça login com Discord para liberar o checkout e salvar seu pedido."}
@@ -56,7 +56,7 @@ export default function Home() {
           <div className="grid gap-4 md:grid-cols-3">
             {[
               ["Planos", "Veja os pacotes disponíveis em uma aba separada e escolha com calma."],
-              ["Pagamento", "Mercado Pago com fluxo pronto para webhooks e confirmação automática."],
+              ["Pagamento", "Checkout pronto com suporte a provedores configuráveis e webhooks."],
               ["Login", "Autenticação com Discord e base pronta para credenciais administrativas."],
             ].map(([title, description]) => (
               <div key={title} className="rounded-3xl border border-white/10 bg-white/5 p-5">

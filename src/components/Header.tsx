@@ -3,10 +3,14 @@
 import { useSession, signIn, signOut } from "next-auth/react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import dynamic from "next/dynamic";
+
+const CartSidebar = dynamic(() => import("../components/CartSidebar"), { ssr: false });
 
 export default function Header() {
   const { data: session } = useSession();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [cartOpen, setCartOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement | null>(null);
 
@@ -35,6 +39,13 @@ export default function Header() {
     };
   }, []);
 
+  // Listen for external requests to open the cart (e.g. from other pages/components)
+  useEffect(() => {
+    const handler = () => setCartOpen(true);
+    window.addEventListener("open_cart", handler as EventListener);
+    return () => window.removeEventListener("open_cart", handler as EventListener);
+  }, []);
+
   return (
     <>
       <header className="w-full border-b border-white/10 bg-slate-950/80 backdrop-blur sticky top-0 z-50">
@@ -60,6 +71,15 @@ export default function Header() {
             >
               Planos
             </Link>
+
+            {/* Cart button */}
+            <button
+              onClick={() => { setMenuOpen(false); setCartOpen(true); }}
+              className="rounded-lg px-3 py-2 text-sm font-medium text-slate-300 transition hover:bg-white/5 hover:text-white"
+              aria-label="Abrir carrinho"
+            >
+              🛒
+            </button>
 
             {/* User Menu */}
             {session?.user ? (
@@ -177,6 +197,17 @@ export default function Header() {
                 <span>Planos</span>
               </Link>
 
+              <button
+                onClick={() => {
+                  setMenuOpen(false);
+                  setCartOpen(true);
+                }}
+                className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-slate-300 hover:text-white hover:bg-white/5 transition"
+              >
+                <span className="text-base">🛒</span>
+                <span>Carrinho</span>
+              </button>
+
               {session?.user ? (
                 <>
                   <div className="rounded-lg bg-white/5 px-3 py-2">
@@ -220,6 +251,9 @@ export default function Header() {
           </div>
         )}
       </header>
+      {/* Cart Sidebar root - controlled via state */}
+      <CartSidebar open={cartOpen} onClose={() => setCartOpen(false)} />
     </>
   );
 }
+

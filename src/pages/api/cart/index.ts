@@ -45,12 +45,40 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (!productId) return res.status(400).json({ error: "productId required" });
       const qty = Math.max(1, Number(quantity || 1));
 
-      const existing = await cartRepo.findOneBy({ userId: dbUser.id, productId });
+      // If productId is not a UUID, assume it's a store slug (e.g., 'starter') and map/create a DB Product
+      const isUuid = (id?: string) => !!id && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
+      let dbProductId = productId;
+
+      if (!isUuid(productId)) {
+        // Lazy import of store products to map slug -> product data
+        const { products: storeProducts } = await import("../../../lib/products");
+        const storeProduct = storeProducts.find((p) => p.id === productId);
+        if (!storeProduct) return res.status(400).json({ error: "Unknown product slug" });
+
+        // Try to find existing DB product by title (best-effort)
+        let dbProduct = await productRepo.findOneBy({ title: storeProduct.name });
+        if (!dbProduct) {
+          // Create a lightweight product record in DB so we can reference it by UUID
+          dbProduct = productRepo.create({
+            title: storeProduct.name,
+            description: storeProduct.description,
+            price: storeProduct.price,
+            stock: 0,
+            deliveryType: "manual",
+            tags: storeProduct.features || [],
+          } as any);
+          await productRepo.save(dbProduct);
+        }
+
+        dbProductId = dbProduct.id;
+      }
+
+      const existing = await cartRepo.findOneBy({ userId: dbUser.id, productId: dbProductId });
       if (existing) {
-        existing.quantity = qty;
+        existing.quantity = existing.quantity + qty;
         await cartRepo.save(existing);
       } else {
-        const created = cartRepo.create({ userId: dbUser.id, productId, quantity: qty });
+        const created = cartRepo.create({ userId: dbUser.id, productId: dbProductId, quantity: qty });
         await cartRepo.save(created);
       }
 
@@ -70,7 +98,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (itemId) {
         await cartRepo.delete({ id: itemId, userId: dbUser.id } as any);
       } else if (productId) {
-        await cartRepo.delete({ userId: dbUser.id, productId } as any);
+        // if productId is a slug, map to db id first
+        const isUuid = (id?: string) => !!id && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
+        let dbProductId = productId;
+        if (!isUuid(productId)) {
+          const { products: storeProducts } = await import("../../../lib/products");
+          const storeProduct = storeProducts.find((p) => p.id === productId);
+          if (storeProduct) {
+            const dbProd = await productRepo.findOneBy({ title: storeProduct.name });
+            if (dbProd) dbProductId = dbProd.id;
+          }
+        }
+
+        await cartRepo.delete({ userId: dbUser.id, productId: dbProductId } as any);
       }
 
       return res.status(200).json({ ok: true });

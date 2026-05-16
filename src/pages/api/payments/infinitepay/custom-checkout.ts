@@ -3,7 +3,6 @@ import { createCustomInfinitePayCheckout } from "@/lib/infinitepay";
 
 const OPCOES = [
   { id: "suporte", valor: 20 },
-  { id: "entrega", valor: 15 },
   { id: "garantia", valor: 10 },
 ];
 
