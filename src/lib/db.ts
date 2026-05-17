@@ -1,32 +1,49 @@
 import AppDataSource from "./data-source";
 import { Product } from "../entities/Product";
+import { buildProductTags, defaultProducts } from "./catalog";
 
-const defaultProducts = [
-  {
-    title: "Pacote Básico",
-    description: "Ideal para quem quer subir rápido sem perder a vibe do personagem.",
-    price: 19.9,
-    stock: 999,
-    deliveryType: "manual",
-    tags: ["starter", "public"],
-  },
-  {
-    title: "Pacote Pro",
-    description: "Para progresso consistente com acompanhamento durante a execução.",
-    price: 49.9,
-    stock: 999,
-    deliveryType: "manual",
-    tags: ["pro", "public"],
-  },
-  {
-    title: "Pacote Elite",
-    description: "A opção mais completa, com tratamento premium e entrega priorizada.",
-    price: 79.9,
-    stock: 999,
-    deliveryType: "manual",
-    tags: ["elite", "public"],
-  },
-];
+const legacyTitles: Record<string, string[]> = {
+  starter: ["Pacote Basico", "Pacote B\u00c3\u00a1sico", "Pacote Starter"],
+  pro: ["Pacote Pro"],
+  elite: ["Pacote Elite"],
+};
+
+export const seedDefaultProducts = async (options: { force?: boolean } = {}) => {
+  const productRepository = AppDataSource.getRepository(Product);
+  const existingProducts = await productRepository.find();
+
+  for (const seed of defaultProducts) {
+    const product =
+      existingProducts.find((item) => (item.tags || []).includes(`plan:${seed.slug}`)) ||
+      existingProducts.find((item) => legacyTitles[seed.slug]?.includes(item.title));
+
+    if (product) {
+      if (options.force) {
+        product.title = seed.title;
+        product.description = seed.description;
+        product.price = seed.price;
+        product.stock = seed.stock;
+        product.deliveryType = seed.deliveryType;
+      }
+      const currentTags = product.tags || [];
+      const seedTags = buildProductTags(seed);
+      product.tags = Array.from(new Set([...currentTags, ...seedTags]));
+      await productRepository.save(product);
+      continue;
+    }
+
+    await productRepository.save(
+      productRepository.create({
+        title: seed.title,
+        description: seed.description,
+        price: seed.price,
+        stock: seed.stock,
+        deliveryType: seed.deliveryType,
+        tags: buildProductTags(seed),
+      })
+    );
+  }
+};
 
 export const ensureDataSource = async () => {
   if (!AppDataSource.isInitialized) {
@@ -71,26 +88,7 @@ export const ensureDataSource = async () => {
     );
   }
 
-  const productRepository = AppDataSource.getRepository(Product);
-  const existingProducts = await productRepository.find();
-
-  if (existingProducts.length === 0) {
-    await productRepository.save(defaultProducts.map((product) => productRepository.create(product)));
-  } else {
-    const defaultByTitle = new Map(defaultProducts.map((product) => [product.title, product] as const));
-
-    for (const product of existingProducts) {
-      const defaultProduct = defaultByTitle.get(product.title);
-      if (defaultProduct && product.price !== defaultProduct.price) {
-        product.price = defaultProduct.price;
-        product.description = defaultProduct.description;
-        product.stock = defaultProduct.stock;
-        product.deliveryType = defaultProduct.deliveryType;
-        product.tags = defaultProduct.tags;
-        await productRepository.save(product);
-      }
-    }
-  }
+  await seedDefaultProducts();
 
   return AppDataSource;
 };

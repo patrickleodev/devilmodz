@@ -6,6 +6,7 @@ import { ensureDataSource } from "../../../lib/db";
 import { CartItem } from "../../../entities/CartItem";
 import { Product } from "../../../entities/Product";
 import { resolveDbUser } from "../../../lib/session";
+import { findDefaultProductBySlug, getProductSlug, buildProductTags } from "../../../lib/catalog";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   res.setHeader('Cache-Control', 'no-store');
@@ -45,27 +46,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (!productId) return res.status(400).json({ error: "productId required" });
       const qty = Math.max(1, Number(quantity || 1));
 
-      // If productId is not a UUID, assume it's a store slug (e.g., 'starter') and map/create a DB Product
       const isUuid = (id?: string) => !!id && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
       let dbProductId = productId;
 
       if (!isUuid(productId)) {
-        // Lazy import of store products to map slug -> product data
-        const { products: storeProducts } = await import("../../../lib/products");
-        const storeProduct = storeProducts.find((p) => p.id === productId);
-        if (!storeProduct) return res.status(400).json({ error: "Unknown product slug" });
+        const seedProduct = findDefaultProductBySlug(productId);
+        if (!seedProduct) return res.status(400).json({ error: "Unknown product slug" });
 
-        // Try to find existing DB product by title (best-effort)
-        let dbProduct: Product | null = await productRepo.findOneBy({ title: storeProduct.name });
+        let dbProduct: Product | undefined | null = (await productRepo.find()).find((product) => getProductSlug(product) === productId);
         if (!dbProduct) {
-          // Create a lightweight product record in DB so we can reference it by UUID
           const createdProduct = productRepo.create({
-            title: storeProduct.name,
-            description: storeProduct.description,
-            price: storeProduct.price,
-            stock: 0,
-            deliveryType: "manual",
-            tags: storeProduct.features || [],
+            title: seedProduct.title,
+            description: seedProduct.description,
+            price: seedProduct.price,
+            stock: seedProduct.stock,
+            deliveryType: seedProduct.deliveryType,
+            tags: buildProductTags(seedProduct),
           } as Partial<Product>);
           await productRepo.save(createdProduct);
           dbProduct = createdProduct;
@@ -99,16 +95,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (itemId) {
         await cartRepo.delete({ id: itemId, userId: dbUser.id } as any);
       } else if (productId) {
-        // if productId is a slug, map to db id first
         const isUuid = (id?: string) => !!id && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
         let dbProductId = productId;
         if (!isUuid(productId)) {
-          const { products: storeProducts } = await import("../../../lib/products");
-          const storeProduct = storeProducts.find((p) => p.id === productId);
-          if (storeProduct) {
-            const dbProd = await productRepo.findOneBy({ title: storeProduct.name });
-            if (dbProd) dbProductId = dbProd.id;
-          }
+          const dbProd = (await productRepo.find()).find((product) => getProductSlug(product) === productId);
+          if (dbProd) dbProductId = dbProd.id;
         }
 
         await cartRepo.delete({ userId: dbUser.id, productId: dbProductId } as any);

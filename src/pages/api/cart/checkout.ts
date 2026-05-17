@@ -4,13 +4,16 @@ import { authOptions } from "../../../lib/auth";
 import { ensureDataSource } from "../../../lib/db";
 import { CartItem } from "../../../entities/CartItem";
 import { Product } from "../../../entities/Product";
-import { Order } from "../../../entities/Order";
 import { Payment } from "../../../entities/Payment";
 import { createCheckoutLink, getAppBaseUrl } from "../../../lib/infinitepay";
-import { sendDiscordChannelMessage, buildOrderCreatedMessage } from "../../../lib/discord";
-import { User } from "../../../entities/User";
 import { resolveDbUser } from "../../../lib/session";
-import { products as storeProducts } from "../../../lib/products";
+
+type CheckoutResponse = {
+  id?: string;
+  url?: string;
+  link?: string;
+  slug?: string;
+};
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   res.setHeader('Cache-Control', 'no-store');
@@ -27,7 +30,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const ds = await ensureDataSource();
     const cartRepo = ds.getRepository(CartItem);
     const productRepo = ds.getRepository(Product);
-    const orderRepo = ds.getRepository(Order);
     const paymentRepo = ds.getRepository(Payment);
 
     const dbUser = await resolveDbUser(sessionUser);
@@ -37,17 +39,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!items || items.length === 0) return res.status(400).json({ error: "Cart is empty" });
 
     // load product details and build MP items
-    const mpItems: any[] = [];
+    const mpItems: Array<{ id: string; title: string; quantity: number; unit_price: number; currency_id: "BRL" }> = [];
     const createdOrders: string[] = [];
-    let total = 0;
 
     for (const it of items) {
       const product = await productRepo.findOneBy({ id: it.productId });
       if (!product) continue;
-      const selectedCatalogPlan = storeProducts.find((plan) => plan.name === product.title || plan.id === product.id);
-      const unitPrice = selectedCatalogPlan?.price ?? product.price;
+      const unitPrice = Number(product.price || 0);
       const amount = unitPrice * it.quantity;
-      total += amount;
 
       // Use raw SQL insert to avoid TypeORM attempting to write columns that may not exist
       const insertRes = await ds.query(
@@ -80,20 +79,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       redirect_url: `${getAppBaseUrl()}/`,
     };
 
-    const checkoutRes = await createCheckoutLink(payload);
+    const checkoutRes = (await createCheckoutLink(payload)) as CheckoutResponse;
 
     // attach provider id to first order if available (use raw UPDATE)
     const firstOrderId = createdOrders[0];
     if (firstOrderId) {
       await ds.query(
         `UPDATE "orders" SET "mpPreferenceId" = $2 WHERE "id" = $1`,
-        [firstOrderId, (checkoutRes as any).id || ""]
+        [firstOrderId, checkoutRes.id || ""]
       );
     }
 
-    await paymentRepo.save(paymentRepo.create({ orderId: firstOrderId || "", provider: "infinitepay", providerPaymentId: (checkoutRes as any).id || "", status: "pending", rawPayload: checkoutRes }));
+    await paymentRepo.save(paymentRepo.create({ orderId: firstOrderId || "", provider: "infinitepay", providerPaymentId: checkoutRes.id || "", status: "pending", rawPayload: checkoutRes }));
 
-    const paymentUrl = (checkoutRes as any).url || (checkoutRes as any).link || ((checkoutRes as any).slug ? `https://checkout.infinitepay.io/${handle}/${(checkoutRes as any).slug}` : undefined);
+    const paymentUrl = checkoutRes.url || checkoutRes.link || (checkoutRes.slug ? `https://checkout.infinitepay.io/${handle}/${checkoutRes.slug}` : undefined);
 
     return res.status(200).json({ orderIds: createdOrders, provider: "infinitepay", paymentUrl, initPoint: paymentUrl });
   } catch (err) {

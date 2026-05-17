@@ -31,7 +31,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       tags?: string[];
     };
 
-    if (!title || !description || typeof price !== "number") {
+    if (!title || !description || typeof price !== "number" || Number.isNaN(price)) {
       return res.status(400).json({ error: "title, description and price are required" });
     }
 

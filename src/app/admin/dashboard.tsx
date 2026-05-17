@@ -38,8 +38,8 @@ type AdminUser = {
 const emptyProductForm = {
   title: "",
   description: "",
-  price: 0,
-  stock: 0,
+  price: "",
+  stock: "",
   deliveryType: "manual",
   tags: "",
 };
@@ -121,8 +121,8 @@ export default function AdminDashboard() {
         body: JSON.stringify({
           title: productForm.title,
           description: productForm.description,
-          price: Number(productForm.price),
-          stock: Number(productForm.stock),
+          price: Number(productForm.price.replace(",", ".")),
+          stock: Number(productForm.stock || 0),
           deliveryType: productForm.deliveryType,
           tags: productForm.tags
             .split(",")
@@ -360,28 +360,28 @@ export default function AdminDashboard() {
                 <input
                   value={productForm.title}
                   onChange={(event) => setProductForm((current) => ({ ...current, title: event.target.value }))}
-                  placeholder="Titulo"
+                  placeholder="Nome do plano. Ex: Pacote Pro"
                   className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm outline-none placeholder:text-slate-500"
                 />
                 <input
                   value={productForm.price}
-                  onChange={(event) => setProductForm((current) => ({ ...current, price: Number(event.target.value) }))}
-                  type="number"
-                  placeholder="Preco"
+                  onChange={(event) => setProductForm((current) => ({ ...current, price: event.target.value }))}
+                  inputMode="decimal"
+                  placeholder="Preco em reais. Ex: 49.90"
                   className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm outline-none placeholder:text-slate-500"
                 />
                 <textarea
                   value={productForm.description}
                   onChange={(event) => setProductForm((current) => ({ ...current, description: event.target.value }))}
-                  placeholder="Descricao"
+                  placeholder="Descreva o que o cliente recebe, prazo e atendimento incluso."
                   className="min-h-[110px] rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm outline-none placeholder:text-slate-500"
                 />
                 <div className="grid gap-3 sm:grid-cols-2">
                   <input
                     value={productForm.stock}
-                    onChange={(event) => setProductForm((current) => ({ ...current, stock: Number(event.target.value) }))}
-                    type="number"
-                    placeholder="Estoque"
+                    onChange={(event) => setProductForm((current) => ({ ...current, stock: event.target.value }))}
+                    inputMode="numeric"
+                    placeholder="Quantidade disponivel. Ex: 999"
                     className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm outline-none placeholder:text-slate-500"
                   />
                   <select
@@ -396,7 +396,7 @@ export default function AdminDashboard() {
                 <input
                   value={productForm.tags}
                   onChange={(event) => setProductForm((current) => ({ ...current, tags: event.target.value }))}
-                  placeholder="Tags separadas por virgula"
+                  placeholder="Tags separadas por virgula. Ex: public, plan:vip, badge:Mais vendido"
                   className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm outline-none placeholder:text-slate-500"
                 />
               </div>

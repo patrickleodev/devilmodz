@@ -10,6 +10,7 @@
     "lint": "eslint",
     "clean-db": "node scripts/clean-database.mjs",
     "db:schema": "tsx scripts/sync-schema.ts",
+    "db:seed": "tsx scripts/seed-products.ts",
     "docker": "docker compose up --build",
     "db": "docker compose up -d db",
     "web": "docker compose up --build app",

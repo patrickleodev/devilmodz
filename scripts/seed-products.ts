@@ -14,9 +14,8 @@ const run = async () => {
       await AppDataSource.initialize();
     }
 
-    await AppDataSource.synchronize(false);
-    await seedDefaultProducts();
-    console.log("Schema e produtos padrao sincronizados.");
+    await seedDefaultProducts({ force: true });
+    console.log("Produtos padrao sincronizados.");
   } finally {
     if (AppDataSource.isInitialized) {
       await AppDataSource.destroy();

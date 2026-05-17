@@ -4,31 +4,29 @@ import { authOptions } from "../../../../lib/auth";
 import { Product } from "../../../../entities/Product";
 import { Payment } from "../../../../entities/Payment";
 import { ensureDataSource } from "../../../../lib/db";
+import { createCheckoutLink, getAppBaseUrl } from "../../../../lib/infinitepay";
 import { sendDiscordChannelMessage, buildOrderCreatedMessage } from "../../../../lib/discord";
 import { User } from "../../../../entities/User";
-import { products as storeProducts } from "../../../../lib/products";
+import { getProductSlug } from "../../../../lib/catalog";
 
 type CheckoutBody = {
   productId?: string;
   quantity?: number;
 };
 
-const PRODUCT_ALIASES: Record<string, string> = {
-  starter: "Pacote Básico",
-  pro: "Pacote Pro",
-  elite: "Pacote Elite",
-};
-
-const PRODUCT_TITLE_ALIASES: Record<string, string[]> = {
-  starter: ["Pacote Básico", "Pacote Starter"],
-  pro: ["Pacote Pro"],
-  elite: ["Pacote Elite"],
+type CheckoutResponse = {
+  id?: string;
+  url?: string;
+  link?: string;
+  checkout_url?: string;
+  slug?: string;
 };
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader("Cache-Control", "no-store");
+
   if (req.method !== "POST") {
     res.setHeader("Allow", ["POST"]);
     return res.status(405).json({ error: "Method not allowed" });
@@ -55,7 +53,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const paymentRepository = dataSource.getRepository(Payment);
     const userRepository = dataSource.getRepository(User);
 
-    // Look up user by Discord ID to get their UUID
     const dbUser = await userRepository.findOneBy({ discordId: sessionUser.id });
     if (!dbUser) {
       return res.status(404).json({ error: "User not found" });
@@ -63,33 +60,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const product = UUID_PATTERN.test(productId)
       ? await productRepository.findOneBy({ id: productId })
-      : await productRepository.findOne({
-          where: PRODUCT_TITLE_ALIASES[productId]
-            ? PRODUCT_TITLE_ALIASES[productId].map((title) => ({ title }))
-            : [{ title: PRODUCT_ALIASES[productId] || productId }],
-        });
+      : (await productRepository.find()).find((item) => getProductSlug(item) === productId);
 
     if (!product) {
       return res.status(404).json({ error: "Product not found" });
     }
 
-    const fallbackPlan = storeProducts.find((plan) => plan.name === product.title);
-    const planId = UUID_PATTERN.test(productId) ? fallbackPlan?.id : productId;
-    const selectedPlan = storeProducts.find((plan) => plan.id === planId);
-    const checkoutUrl = selectedPlan?.checkoutUrl;
-
-    if (!checkoutUrl) {
-      return res.status(400).json({ error: "Checkout link is not configured for this plan" });
-    }
-
-    const selectedCatalogPlan = storeProducts.find((plan) => plan.name === product.title || plan.id === productId);
-    const unitPrice = selectedCatalogPlan?.price ?? product.price;
+    const unitPrice = Number(product.price || 0);
     const amount = unitPrice * quantity;
     const result = await dataSource.query(
-      `INSERT INTO "orders" ("userId", "productId", "amount", "status", "mpPreferenceId")
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO "orders" ("userId", "productId", "amount", "status")
+       VALUES ($1, $2, $3, $4)
        RETURNING "id"`,
-      [dbUser.id, product.id, amount, "pending", checkoutUrl]
+      [dbUser.id, product.id, amount, "pending"]
     );
 
     const savedOrderId = result?.[0]?.id as string | undefined;
@@ -98,21 +81,43 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(500).json({ error: "Failed to create order" });
     }
 
+    const handle = process.env.INFINITEPAY_TAG;
+    if (!handle) return res.status(500).json({ error: "INFINITEPAY_TAG not configured" });
+
+    const checkout = (await createCheckoutLink({
+      handle,
+      items: [{ description: product.title, quantity, price: Math.round(unitPrice * 100) }],
+      order_nsu: savedOrderId,
+      webhook_url: `${getAppBaseUrl()}/api/payments/infinitepay/webhook`,
+      redirect_url: `${getAppBaseUrl()}/`,
+    })) as CheckoutResponse;
+
+    const checkoutUrl =
+      checkout.url ||
+      checkout.link ||
+      checkout.checkout_url ||
+      (checkout.slug ? `https://checkout.infinitepay.io/${handle}/${checkout.slug}` : undefined);
+
+    await dataSource.query(`UPDATE "orders" SET "mpPreferenceId" = $2 WHERE "id" = $1`, [
+      savedOrderId,
+      checkout.id || checkoutUrl || "",
+    ]);
+
     await paymentRepository.save(
       paymentRepository.create({
         orderId: savedOrderId,
         provider: "infinitepay",
-        providerPaymentId: checkoutUrl,
+        providerPaymentId: checkout.id || checkoutUrl || "",
         status: "pending",
         rawPayload: {
           checkoutUrl,
-          planId: selectedPlan?.id,
-          source: "static-checkout",
+          productId: product.id,
+          source: "dynamic-checkout",
+          response: checkout,
         },
       })
     );
 
-    // notify Discord channel about created order (mention user if discordId available)
     try {
       const mention = dbUser.discordId ? `<@${dbUser.discordId}>` : null;
       await sendDiscordChannelMessage(
@@ -125,8 +130,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         })
       );
     } catch (notifyErr) {
-      // ignore notification failures
-      // eslint-disable-next-line no-console
       console.warn("Discord notify failed:", notifyErr);
     }
 
