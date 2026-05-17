@@ -9,10 +9,12 @@
     "start": "next start",
     "lint": "eslint",
     "clean-db": "node scripts/clean-database.mjs",
+    "db:schema": "tsx scripts/sync-schema.ts",
     "docker": "docker compose up --build",
     "db": "docker compose up -d db",
     "web": "docker compose up --build app",
     "bot": "node dist/bot/index.js",
+    "create-admin": "tsx scripts/create-admin-user.ts",
     "verify-env": "node scripts/validate-env.mjs"
   },
   "dependencies": {
