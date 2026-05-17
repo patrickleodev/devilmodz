@@ -32,9 +32,9 @@ export default function PlanosPage() {
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || "Falha ao adicionar ao carrinho");
 
-      // Open cart sidebar so user sees the item
+      // Notify the header to pulse the cart icon
       try {
-        window.dispatchEvent(new Event("open_cart"));
+        window.dispatchEvent(new Event("cart_notify"));
       } catch (e) {
         /* ignore */
       }

@@ -61,10 +61,16 @@ export default function CartSidebar({ open, onClose }: { open: boolean; onClose:
     <div className={`fixed inset-0 z-60 flex transition-opacity duration-300 ${open ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"}`}>
       <div className="absolute inset-0 bg-black/50 transition-opacity duration-300" onClick={onClose} />
 
-      <aside className={`ml-auto w-full max-w-md border-l border-white/10 bg-slate-950 p-6 transition-transform duration-300 ease-out ${open ? "translate-x-0" : "translate-x-full"}`}>
+      <aside className={`ml-auto flex h-full w-full max-w-md flex-col border-l border-white/10 bg-slate-950 p-6 transition-transform duration-300 ease-out ${open ? "translate-x-0" : "translate-x-full"}`}>
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold">Carrinho</h2>
-          <button onClick={onClose} className="rounded-full p-2 hover:bg-white/5">✕</button>
+          <button
+            onClick={onClose}
+            className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-white/5 text-slate-200 transition hover:bg-white/10"
+            aria-label="Fechar carrinho"
+          >
+            ✕
+          </button>
         </div>
 
         {!session ? (
@@ -76,26 +82,38 @@ export default function CartSidebar({ open, onClose }: { open: boolean; onClose:
 
         {error ? <div className="mt-4 text-red-500">{error}</div> : null}
 
-        <div className="mt-6 space-y-4">
-          {loading ? <div>Carregando...</div> : null}
-          {items.length === 0 && !loading ? <div>Seu carrinho está vazio.</div> : null}
-          {items.map((it) => (
-            <div key={it.id} className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 p-3">
-              <div className="min-w-0">
-                <div className="truncate font-medium">{it.product?.title || it.productId}</div>
-                <div className="text-sm text-slate-400">Quantidade: {it.quantity}</div>
-              </div>
-              <div className="flex items-center gap-2">
-                <button onClick={() => handleRemove(it.id)} className="rounded-2xl bg-rose-500 px-3 py-2 text-white">Remover</button>
-              </div>
+        <div className="mt-6 flex h-0 flex-1">
+          {loading ? (
+            <div className="flex h-full w-full items-center justify-center text-slate-400">Carregando...</div>
+          ) : items.length === 0 && session ? (
+            <div className="flex h-full w-full items-center justify-center text-slate-400">Seu carrinho está vazio.</div>
+          ) : (
+            <div className="flex w-full flex-col gap-4">
+              {items.map((it) => (
+                <div key={it.id} className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 p-3">
+                  <div className="min-w-0 pr-3">
+                    <div className="truncate font-medium">{it.product?.title || it.productId}</div>
+                    <div className="text-sm text-slate-400">Quantidade: {it.quantity}</div>
+                  </div>
+                  <button
+                    onClick={() => handleRemove(it.id)}
+                    aria-label="Remover item do carrinho"
+                    className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-white/5 text-rose-500 transition hover:bg-rose-500/10 hover:text-rose-600"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
             </div>
-          ))}
+          )}
         </div>
 
-        <div className="mt-6 flex flex-col gap-3">
-          <button onClick={handleCheckout} className="w-full rounded-2xl bg-emerald-400 px-4 py-3 font-semibold text-slate-950">Finalizar compra</button>
-          <button onClick={handleClearCart} className="w-full rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 font-semibold text-rose-100">Limpar carrinho</button>
-        </div>
+        {session && items.length > 0 ? (
+          <div className="mt-6 flex flex-col gap-3 border-t border-white/10 pt-6">
+            <button onClick={handleCheckout} className="w-full cursor-pointer rounded-2xl bg-emerald-400 px-4 py-3 font-semibold text-slate-950">Finalizar compra</button>
+            <button onClick={handleClearCart} className="w-full cursor-pointer bg-transparent px-0 py-0 text-center text-sm font-semibold text-slate-300 transition hover:text-white">Limpar carrinho</button>
+          </div>
+        ) : null}
       </aside>
     </div>
   );

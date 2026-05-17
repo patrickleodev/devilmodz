@@ -11,8 +11,11 @@ export default function Header() {
   const { data: session } = useSession();
   const [menuOpen, setMenuOpen] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
+  const [cartNotify, setCartNotify] = useState(false);
+  const [cartNotifyCount, setCartNotifyCount] = useState(0);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement | null>(null);
+  const cartNotifyTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
     const handlePointerDown = (event: MouseEvent) => {
@@ -41,9 +44,32 @@ export default function Header() {
 
   // Listen for external requests to open the cart (e.g. from other pages/components)
   useEffect(() => {
-    const handler = () => setCartOpen(true);
-    window.addEventListener("open_cart", handler as EventListener);
-    return () => window.removeEventListener("open_cart", handler as EventListener);
+    const openCartHandler = () => {
+      setCartOpen(true);
+      setCartNotifyCount(0);
+      setCartNotify(false);
+    };
+    window.addEventListener("open_cart", openCartHandler as EventListener);
+    return () => window.removeEventListener("open_cart", openCartHandler as EventListener);
+  }, []);
+
+  useEffect(() => {
+    const notifyHandler = () => {
+      if (cartNotifyTimeoutRef.current) {
+        window.clearTimeout(cartNotifyTimeoutRef.current);
+      }
+      setCartNotify(true);
+      setCartNotifyCount((count) => count + 1);
+      cartNotifyTimeoutRef.current = window.setTimeout(() => setCartNotify(false), 1400);
+    };
+
+    window.addEventListener("cart_notify", notifyHandler as EventListener);
+    return () => {
+      window.removeEventListener("cart_notify", notifyHandler as EventListener);
+      if (cartNotifyTimeoutRef.current) {
+        window.clearTimeout(cartNotifyTimeoutRef.current);
+      }
+    };
   }, []);
 
   return (
@@ -104,11 +130,18 @@ export default function Header() {
           <div className="hidden items-center gap-6 md:flex">
             {/* Cart button */}
             <button
-              onClick={() => { setMenuOpen(false); setCartOpen(true); }}
-              className="cursor-pointer rounded-lg px-3 py-2 text-sm font-medium text-slate-300 transition hover:bg-white/5 hover:text-white"
+              onClick={() => { setMenuOpen(false); setCartOpen(true); setCartNotifyCount(0); setCartNotify(false); }}
+              className="relative cursor-pointer rounded-lg px-3 py-2 text-sm font-medium text-slate-300 transition hover:bg-white/5 hover:text-white"
               aria-label="Abrir carrinho"
             >
-              🛒
+              <span className="relative inline-flex">
+                🛒
+                {cartNotifyCount > 0 ? (
+                  <span className={`absolute -right-2 -top-2 inline-flex min-w-[1.3rem] items-center justify-center rounded-full bg-emerald-400 px-1.5 text-[0.65rem] font-semibold text-slate-950 shadow-[0_0_0_4px_rgba(16,185,129,0.15)] ${cartNotify ? "animate-cart-notification" : ""}`}>
+                    {cartNotifyCount}
+                  </span>
+                ) : null}
+              </span>
             </button>
 
             {/* User Menu */}
@@ -249,10 +282,19 @@ export default function Header() {
                 onClick={() => {
                   setMenuOpen(false);
                   setCartOpen(true);
+                  setCartNotifyCount(0);
+                  setCartNotify(false);
                 }}
-                className="flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-slate-300 hover:text-white hover:bg-white/5 transition"
+                className="relative flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-slate-300 hover:text-white hover:bg-white/5 transition"
               >
-                <span className="text-base">🛒</span>
+                <span className="relative inline-flex">
+                  🛒
+                  {cartNotifyCount > 0 ? (
+                    <span className={`absolute -right-2 -top-2 inline-flex min-w-[1.3rem] items-center justify-center rounded-full bg-emerald-400 px-1.5 text-[0.65rem] font-semibold text-slate-950 shadow-[0_0_0_4px_rgba(16,185,129,0.15)] ${cartNotify ? "animate-cart-notification" : ""}`}>
+                      {cartNotifyCount}
+                    </span>
+                  ) : null}
+                </span>
                 <span>Carrinho</span>
               </button>
 
