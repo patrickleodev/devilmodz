@@ -659,17 +659,45 @@ export default function AdminDashboard() {
               ) : (
                 products.map((product) => {
                   const isEditingProduct = editingProductId === product.id;
+                  const isCustomPlan = (product.tags || []).includes("custom:plan");
+                  
+                  // Extract custom plan details from tags
+                  let customPlanDetails = { money: 0, clothes: 0, cars: 0 };
+                  if (isCustomPlan) {
+                    (product.tags || []).forEach((tag) => {
+                      if (tag.startsWith("money:")) customPlanDetails.money = parseInt(tag.split(":")[1], 10);
+                      if (tag.startsWith("clothes:")) customPlanDetails.clothes = parseInt(tag.split(":")[1], 10);
+                      if (tag.startsWith("cars:")) customPlanDetails.cars = parseInt(tag.split(":")[1], 10);
+                    });
+                  }
+                  
                   return (
                   <article
                     key={product.id}
-                    className={`rounded-2xl border border-white/10 bg-slate-950/70 p-4 ${
+                    className={`rounded-2xl border ${
+                      isCustomPlan ? "border-violet-500/30 bg-violet-500/5" : "border-white/10 bg-slate-950/70"
+                    } p-4 ${
                       isEditingProduct ? "opacity-60 grayscale pointer-events-none" : ""
                     }`}
                   >
                     <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <h3 className="text-lg font-semibold text-white">{product.title}</h3>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-lg font-semibold text-white">{product.title}</h3>
+                          {isCustomPlan && (
+                            <span className="rounded-full border border-violet-400/30 bg-violet-400/10 px-2 py-1 text-xs font-medium text-violet-300">
+                              ⚙️ Personalizado
+                            </span>
+                          )}
+                        </div>
                         <p className="mt-2 text-sm leading-6 text-slate-400">{product.description}</p>
+                        {isCustomPlan && (
+                          <div className="mt-3 flex gap-3 text-xs text-slate-300">
+                            <span className="rounded-md bg-emerald-500/15 px-2 py-1">💰 {customPlanDetails.money}M</span>
+                            <span className="rounded-md bg-cyan-500/15 px-2 py-1">👕 {customPlanDetails.clothes} trajes</span>
+                            <span className="rounded-md bg-pink-500/15 px-2 py-1">🚗 {customPlanDetails.cars} carros</span>
+                          </div>
+                        )}
                       </div>
                       <span className="rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-xs text-cyan-200">
                         {money.format(product.price)}
