@@ -106,6 +106,22 @@ const updateOrderStatus = async (
   );
 };
 
+const inferTransactionStatus = (transaction: any, fallbackStatus: string = "pending") => {
+  if (transaction?.paid === true) {
+    return "completed";
+  }
+
+  if (transaction?.success === true && transaction?.paid !== false) {
+    return "completed";
+  }
+
+  if (Number(transaction?.paid_amount) === Number(transaction?.amount)) {
+    return "completed";
+  }
+
+  return fallbackStatus;
+};
+
 const getTransactionIdFromRequest = (req: NextApiRequest) => {
   // InfinitePay sends transaction ID in different ways depending on webhook type
   const body = req.body as
@@ -280,7 +296,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // Prefer explicit status if provided by InfinitePay, otherwise infer from paid vs amount
       const txStatus = (transaction.status || transaction.transaction_status || transaction.transactionStatus || "").toString();
 
-      const inferredStatus = txStatus ? mapInfinitePayStatusToOrderStatus(txStatus) : ((Number(transaction.paid_amount) === Number(transaction.amount)) ? "completed" : "pending");
+      const inferredStatus = txStatus ? mapInfinitePayStatusToOrderStatus(txStatus) : inferTransactionStatus(transaction);
 
       payment = paymentRepository.create({
         orderId: order.id,
@@ -302,7 +318,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Update payment status based on InfinitePay transaction status
     // If payment.status wasn't set above, infer from amount match
-    const newStatus = mapInfinitePayStatusToOrderStatus(payment.status || (req.body.paid_amount === req.body.amount ? "completed" : "pending"));
+    const newStatus = mapInfinitePayStatusToOrderStatus(payment.status || inferTransactionStatus(req.body));
 
     console.log("[InfinitePay Webhook] Mapped payment status:", payment.status, "->", newStatus);
 
