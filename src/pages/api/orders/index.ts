@@ -72,7 +72,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const detailed = await Promise.all(
       orders.map(async (o) => {
         const product = await productRepo.findOneBy({ id: o.productId });
-        const payment = await paymentRepo.findOne({ where: { orderId: o.id } });
+        const payments = await paymentRepo.find({ where: { orderId: o.id } });
+        const payment =
+          payments.find((entry) => ["completed", "paid", "approved"].includes(String(entry.status).toLowerCase())) ||
+          payments[0] ||
+          null;
         return {
           ...o,
           discordThreadId: o.discordThreadId || null,

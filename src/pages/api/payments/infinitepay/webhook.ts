@@ -307,13 +307,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     console.log("[InfinitePay Webhook] Mapped payment status:", payment.status, "->", newStatus);
 
-    payment.status = newStatus;
-    payment.rawPayload = { ...payment.rawPayload, ...req.body };
+    const existingPayment =
+      (await paymentRepository.findOne({
+        where: {
+          orderId: order.id,
+          provider: "infinitepay",
+        },
+      })) || payment;
+
+    existingPayment.provider = "infinitepay";
+    existingPayment.orderId = order.id;
+    existingPayment.providerPaymentId = transactionId || checkoutId || existingPayment.providerPaymentId;
+    existingPayment.status = newStatus;
+    existingPayment.rawPayload = { ...existingPayment.rawPayload, ...req.body, ...transaction };
 
     if (newStatus === "paid" || newStatus === "completed") {
       console.log("[InfinitePay Webhook] Pagamento confirmado para ordem:", order.id);
       console.log("[InfinitePay Webhook] Order status:", order.status, "Order discordThreadId:", order.discordThreadId);
-      payment.confirmedAt = payment.confirmedAt || new Date();
+      existingPayment.confirmedAt = existingPayment.confirmedAt || new Date();
 
       if (!order.discordThreadId) {
         try {
@@ -374,7 +385,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       console.log("[InfinitePay Webhook] Payment status is not paid/completed, skipping ticket creation. Status:", newStatus);
     }
 
-    await paymentRepository.save(payment);
+    await paymentRepository.save(existingPayment);
 
     return res.status(200).json({ ok: true });
   } catch (error) {
