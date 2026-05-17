@@ -57,16 +57,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (!dbUser) return res.status(404).json({ error: "User not found" });
 
-    // Create temporary product
-    const productTitle = `Plano Personalizado (${milhoes}m, ${trajes}t, ${carros}c)`;
-
+    // Create temporary product with generic title for checkout, details in tags for admin
     const productQuery = await dataSource.query(
       `INSERT INTO "products" ("title", "description", "price", "deliveryType", "tags", "stock", "createdAt")
        VALUES ($1, $2, $3, $4, $5, $6, NOW())
        RETURNING "id"`,
       [
-        productTitle,
-        `Dinheiro: ${milhoes}M | Trajes: ${trajes} | Carros: ${carros}`,
+        "Plano Personalizado GTA",
+        "Produto personalizado com configurações customizadas",
         price,
         "automatic",
         `custom:plan,money:${milhoes},clothes:${trajes},cars:${carros}`,
