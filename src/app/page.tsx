@@ -2,6 +2,14 @@
 
 import Link from "next/link";
 import { signIn, useSession } from "next-auth/react";
+import { SiMastercard, SiMercadopago, SiPix, SiVisa } from "react-icons/si";
+
+const paymentMethods = [
+  { name: "Mercado Pago", icon: SiMercadopago, className: "text-sky-300" },
+  { name: "Pix", icon: SiPix, className: "text-emerald-300" },
+  { name: "Visa", icon: SiVisa, className: "text-blue-300" },
+  { name: "Mastercard", icon: SiMastercard, className: "text-orange-300" },
+];
 
 export default function Home() {
   const { data: session } = useSession();
@@ -37,17 +45,21 @@ export default function Home() {
                 >
                   Entrar com Discord
                 </button>
-              ) : (
-                <span className="ml-2 mt-2 inline-block text-sm text-slate-300 sm:mt-0">Conectado</span>
-              )}
+              ) : null}
             </div>
 
             <div className="mt-8 flex flex-wrap items-center gap-4">
               <span className="text-sm text-slate-400">Pagamentos:</span>
-              <img src="/mp.svg" alt="Mercado Pago" className="h-6" />
-              <img src="/pix.svg" alt="Pix" className="h-6" />
-              <img src="/visa.svg" alt="Visa" className="h-6" />
-              <img src="/mastercard.svg" alt="Mastercard" className="h-6" />
+              {paymentMethods.map(({ name, icon: Icon, className }) => (
+                <span
+                  key={name}
+                  className="inline-flex h-8 items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 text-sm font-semibold text-white"
+                  aria-label={name}
+                >
+                  <Icon className={`h-5 w-5 ${className}`} aria-hidden="true" />
+                  {name}
+                </span>
+              ))}
             </div>
           </div>
 
@@ -113,7 +125,7 @@ export default function Home() {
         <h2 className="text-2xl font-semibold text-white">Depoimentos</h2>
         <div className="mt-6 space-y-4">
           <blockquote className="rounded-2xl border border-white/6 bg-white/5 p-6">
-            <p className="text-slate-300">"Atendimento top e entrega rápida. Recomendo 100%"</p>
+            <p className="text-slate-300">&quot;Atendimento top e entrega rápida. Recomendo 100%&quot;</p>
             <footer className="mt-3 text-sm text-slate-400">— Cliente satisfeito</footer>
           </blockquote>
         </div>
