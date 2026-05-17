@@ -31,21 +31,42 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     console.log("[Orders Ticket Open] Resolved DB user:", dbUser.id);
 
-    const [order] = (await ds.query(
-      `SELECT "id", "userId", "productId", "amount", "status", "createdAt", 
-              COALESCE("discordThreadId", NULL) AS "discordThreadId",
-              COALESCE("discordThreadUrl", NULL) AS "discordThreadUrl"
-       FROM "orders" 
-       WHERE "id" = $1`,
-      [id]
-    )) as Array<any>;
+    const [columnPresence] = (await ds.query(
+      `SELECT
+         EXISTS (
+           SELECT 1 FROM information_schema.columns
+           WHERE table_schema = 'public' AND table_name = 'orders' AND column_name = 'discordThreadId'
+         ) AS "hasDiscordThreadId",
+         EXISTS (
+           SELECT 1 FROM information_schema.columns
+           WHERE table_schema = 'public' AND table_name = 'orders' AND column_name = 'discordThreadUrl'
+         ) AS "hasDiscordThreadUrl"
+      `
+    )) as Array<{ hasDiscordThreadId: boolean; hasDiscordThreadUrl: boolean }>;
+
+    const hasDiscordThreadId = Boolean(columnPresence?.hasDiscordThreadId);
+    const hasDiscordThreadUrl = Boolean(columnPresence?.hasDiscordThreadUrl);
+
+    const selectCols = [
+      '"id"',
+      '"userId"',
+      '"productId"',
+      '"amount"',
+      '"status"',
+      '"createdAt"',
+    ];
+
+    if (hasDiscordThreadId) selectCols.push('COALESCE("discordThreadId", NULL) AS "discordThreadId"');
+    if (hasDiscordThreadUrl) selectCols.push('COALESCE("discordThreadUrl", NULL) AS "discordThreadUrl"');
+
+    const [order] = (await ds.query(`SELECT ${selectCols.join(', ')} FROM "orders" WHERE "id" = $1`, [id])) as Array<any>;
     
     if (!order) return res.status(404).json({ error: "Order not found" });
     if (order.userId !== dbUser.id) return res.status(403).json({ error: "Forbidden" });
 
     console.log("[Orders Ticket Open] Order validated:", order.id, order.status);
 
-    if (order.discordThreadId && order.discordThreadUrl) {
+    if (hasDiscordThreadId && hasDiscordThreadUrl && order.discordThreadId && order.discordThreadUrl) {
       return res.status(200).json({ threadUrl: order.discordThreadUrl });
     }
 
@@ -67,13 +88,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!ticket) return res.status(500).json({ error: "Failed to create ticket" });
 
     if (ticket.threadId) {
-      await ds.query(
-        `UPDATE "orders"
-         SET "discordThreadId" = $2,
-             "discordThreadUrl" = $3
-         WHERE "id" = $1`,
-        [id, ticket.threadId, ticket.threadUrl || null]
-      );
+      if (hasDiscordThreadId) {
+        // Only attempt to update DB columns if they exist
+        const updateCols: string[] = [];
+        const values: any[] = [id];
+        let idx = 2;
+
+        updateCols.push(`"discordThreadId" = $${idx}`);
+        values.push(ticket.threadId);
+        idx++;
+
+        if (hasDiscordThreadUrl) {
+          updateCols.push(`"discordThreadUrl" = $${idx}`);
+          values.push(ticket.threadUrl || null);
+          idx++;
+        }
+
+        await ds.query(
+          `UPDATE "orders" SET ${updateCols.join(', ')} WHERE "id" = $1`,
+          values
+        );
+      }
+
       return res.status(200).json({ threadUrl: ticket.threadUrl });
     }
 
