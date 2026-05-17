@@ -1,12 +1,23 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { createCustomInfinitePayCheckout } from "@/lib/infinitepay";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/lib/auth";
+import { ensureDataSource } from "@/lib/db";
+import { createCheckoutLink, getAppBaseUrl } from "@/lib/infinitepay";
+import { resolveDbUser } from "@/lib/session";
+import { createOrderTicketThread } from "@/lib/discord";
 
 const MIN_MILHOES = 0;
 const MAX_MILHOES = 3000;
 const STEP_MILHOES = 30;
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  res.setHeader('Cache-Control', 'no-store');
   if (req.method !== "POST") return res.status(405).end();
+
+  const session = await getServerSession(req, res, authOptions);
+  const sessionUser = session?.user as { id?: string } | undefined;
+  if (!sessionUser?.id) return res.status(401).json({ error: "Unauthorized" });
+
   const { milhoes, trajes, carros } = req.body;
   const milhoesValue = Number(milhoes);
   const trajesValue = Number(trajes || 0);
@@ -40,10 +51,83 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(400).json({ error: "Valor mínimo para checkout é R$2,00" });
   }
 
-  // Cria o checkout na InfinitePay
+  // Cria produto, pedido, pagamento e checkout link
   try {
-    const url = await createCustomInfinitePayCheckout(total, label);
-    return res.json({ url });
+    const ds = await ensureDataSource();
+    const dbUser = await resolveDbUser(sessionUser);
+    if (!dbUser) return res.status(404).json({ error: "User not found" });
+
+    // Create a temporary product for this custom plan
+    const productInsert = await ds.query(
+      `INSERT INTO "products" (title, description, price, stock, "deliveryType", tags) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
+      [
+        `Plano Personalizado`,
+        `Plano customizado gerado pelo usuário.`,
+        total,
+        0,
+        "manual",
+        null,
+      ]
+    );
+
+    const productId = productInsert?.[0]?.id as string | undefined;
+    if (!productId) return res.status(500).json({ error: "Failed to create product" });
+
+    // Create order
+    const orderInsert = await ds.query(
+      `INSERT INTO "orders" ("userId", "productId", amount, status) VALUES ($1, $2, $3, $4) RETURNING id`,
+      [dbUser.id, productId, total, "pending"]
+    );
+
+    const orderId = orderInsert?.[0]?.id as string | undefined;
+    if (!orderId) return res.status(500).json({ error: "Failed to create order" });
+
+    // Build InfinitePay link payload
+    const handle = process.env.INFINITEPAY_TAG;
+    if (!handle) return res.status(500).json({ error: "INFINITEPAY_TAG not configured" });
+
+    const notificationUrl = `${getAppBaseUrl()}/api/payments/infinitepay/webhook`;
+
+    const items = [
+      { description: label, quantity: 1, price: Math.round(total * 100) },
+    ];
+
+    const payload: Record<string, unknown> = {
+      handle,
+      items,
+      order_nsu: orderId,
+      webhook_url: notificationUrl,
+      redirect_url: `${getAppBaseUrl()}/`,
+    };
+
+    const checkoutRes = await createCheckoutLink(payload);
+
+    // Save payment record
+    const paymentInsert = await ds.query(
+      `INSERT INTO "payments" ("orderId", provider, "providerPaymentId", status, "rawPayload") VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+      [orderId, "infinitepay", checkoutRes.id || checkoutRes.link || checkoutRes.slug || "", "pending", JSON.stringify(checkoutRes)],
+    );
+
+    // Try to create a Discord ticket for the order
+    try {
+      const ticket = await createOrderTicketThread({
+        orderId,
+        productTitle: `Plano Personalizado`,
+        amount: total,
+        mention: null,
+        userEmail: dbUser.email || null,
+      });
+
+      if (ticket?.threadId) {
+        await ds.query(`UPDATE "orders" SET "discordThreadId" = $2, "discordThreadUrl" = $3 WHERE id = $1`, [orderId, ticket.threadId, ticket.threadUrl]);
+      }
+    } catch (err) {
+      console.error("Failed to create Discord ticket for custom plan:", err);
+    }
+
+    const paymentUrl = checkoutRes.url || checkoutRes.link || checkoutRes.checkout_url || (checkoutRes.slug ? `https://checkout.infinitepay.io/${handle}/${checkoutRes.slug}` : undefined);
+
+    return res.status(200).json({ orderId, paymentUrl, provider: "infinitepay" });
   } catch (e) {
     // Log detalhado para debug
     console.error("Erro ao criar checkout InfinitePay:", e);
