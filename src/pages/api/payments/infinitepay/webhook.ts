@@ -3,6 +3,7 @@ import { Payment } from "../../../../entities/Payment";
 import { Product } from "../../../../entities/Product";
 import { ensureDataSource } from "../../../../lib/db";
 import { createOrderTicketThread } from "../../../../lib/discord";
+import { fetchInfinitePayTransaction } from "../../../../lib/infinitepay";
 import { User } from "../../../../entities/User";
 
 type OrderRow = {
@@ -255,24 +256,40 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     if (!payment) {
-      const transaction = req.body as any;
+      // Prefer to fetch the authoritative transaction from InfinitePay when we have an ID
+      let transaction = req.body as any;
+
+      if (transactionId) {
+        try {
+          const fetched = await fetchInfinitePayTransaction(transactionId);
+          if (fetched) {
+            transaction = { ...transaction, ...fetched };
+            console.log("[InfinitePay Webhook] Fetched transaction from API:", JSON.stringify(fetched));
+          }
+        } catch (fetchErr) {
+          console.error("[InfinitePay Webhook] Failed to fetch transaction from API:", fetchErr instanceof Error ? fetchErr.message : String(fetchErr));
+        }
+      }
+
       const order = await findOrderForWebhook(dataSource, transaction, transactionId);
 
-        if (!order) {
-          console.log("[InfinitePay Webhook] Unable to match order for incoming payload. Payload:", JSON.stringify(transaction));
-          return res.status(200).json({ ok: true, ignored: true });
-        }
+      if (!order) {
+        console.log("[InfinitePay Webhook] Unable to match order for incoming payload. Payload:", JSON.stringify(transaction));
+        return res.status(200).json({ ok: true, ignored: true });
+      }
 
-        // InfinitePay doesn't send explicit status, so infer from paid_amount === amount
-        const inferredStatus = (transaction.paid_amount === transaction.amount) ? "completed" : "pending";
+      // Prefer explicit status if provided by InfinitePay, otherwise infer from paid vs amount
+      const txStatus = (transaction.status || transaction.transaction_status || transaction.transactionStatus || "").toString();
 
-        payment = paymentRepository.create({
-          orderId: order.id,
-          provider: "infinitepay",
-          providerPaymentId: transactionId ?? undefined,
-          status: inferredStatus,
-          rawPayload: transaction,
-        } as Partial<Payment>);
+      const inferredStatus = txStatus ? mapInfinitePayStatusToOrderStatus(txStatus) : ((Number(transaction.paid_amount) === Number(transaction.amount)) ? "completed" : "pending");
+
+      payment = paymentRepository.create({
+        orderId: order.id,
+        provider: "infinitepay",
+        providerPaymentId: transactionId ?? undefined,
+        status: inferredStatus,
+        rawPayload: transaction,
+      } as Partial<Payment>);
     } else if (checkoutId && payment.provider !== "infinitepay") {
       payment.provider = "infinitepay";
     }

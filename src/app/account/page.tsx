@@ -36,8 +36,34 @@ const buildDemoOrders = (count = 45): AccountOrder[] => {
   const statuses = ["completed", "paid", "processing", "pending"];
   const paymentStatuses = ["paid", "approved", "pending", "pending"];
 
-  return Array.from({ length: count }, (_, index) => {
-    const dayOffset = index;
+  // Distribuição pensada para testar os rótulos da timeline:
+  // Hoje, Ontem, dias da semana e datas antigas.
+  const dayOffsets = [
+    0, 0, 0,
+    1, 1,
+    2, 2,
+    3, 3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    10,
+    12,
+    14,
+    18,
+    20,
+    24,
+    28,
+    30,
+    33,
+    37,
+    40,
+  ];
+
+  const normalizedOffsets = Array.from({ length: count }, (_, index) => dayOffsets[index % dayOffsets.length] + Math.floor(index / dayOffsets.length) * 7);
+
+  return normalizedOffsets.map((dayOffset, index) => {
     const timestamp = new Date(now);
     timestamp.setDate(now.getDate() - dayOffset);
     timestamp.setHours(10 + (index % 8), (index * 7) % 60, 0, 0);
@@ -69,6 +95,7 @@ export default function AccountPage() {
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [ordersError, setOrdersError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
+  const [showDemoPreview, setShowDemoPreview] = useState(false);
 
   const money = useMemo(
     () => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }),
@@ -77,12 +104,13 @@ export default function AccountPage() {
 
   const displayOrders = useMemo(() => {
     const hasRealOrders = orders.length > 0;
+    const shouldShowDemo = !hasRealOrders || showDemoPreview;
 
-    if (hasRealOrders) return orders;
+    if (!shouldShowDemo) return orders;
 
     // Fallback para teste visual da página e paginação
     return buildDemoOrders(45);
-  }, [orders]);
+  }, [orders, showDemoPreview]);
 
   const totalPages = Math.max(1, Math.ceil(displayOrders.length / ORDERS_PER_PAGE));
   const safePage = Math.min(page, totalPages);
@@ -116,7 +144,7 @@ export default function AccountPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [session?.user, orders.length]);
+  }, [session?.user, orders.length, showDemoPreview]);
 
   const openTicket = async (orderId: string) => {
     try {
@@ -234,7 +262,16 @@ export default function AccountPage() {
               <p className="text-xs uppercase tracking-[0.28em] text-slate-500">Histórico</p>
               <h2 className="mt-2 text-2xl font-semibold text-white">Histórico de compras</h2>
             </div>
-            <p className="text-sm text-slate-400">Pedidos e tickets criados automaticamente após a confirmação.</p>
+            <div className="flex flex-col gap-2 text-sm text-slate-400 sm:items-end">
+              <p>Pedidos e tickets criados automaticamente após a confirmação.</p>
+              <button
+                type="button"
+                onClick={() => setShowDemoPreview((current) => !current)}
+                className="inline-flex w-fit items-center justify-center rounded-2xl border border-cyan-400/20 bg-cyan-400/10 px-4 py-2 text-xs font-semibold text-cyan-100 transition hover:bg-cyan-400/20"
+              >
+                {showDemoPreview ? "Ocultar pedidos de teste" : "Mostrar pedidos de teste"}
+              </button>
+            </div>
           </div>
 
           <div className="mt-6 space-y-4">
@@ -283,6 +320,10 @@ export default function AccountPage() {
                     {!orders.length ? (
                       <div className="rounded-2xl border border-cyan-400/20 bg-cyan-400/10 px-4 py-3 text-sm text-cyan-100">
                         Exibindo pedidos fictícios para teste da paginação.
+                      </div>
+                    ) : showDemoPreview ? (
+                      <div className="rounded-2xl border border-cyan-400/20 bg-cyan-400/10 px-4 py-3 text-sm text-cyan-100">
+                        Visualização de pedidos de teste ativada para conferir os rótulos.
                       </div>
                     ) : null}
 
