@@ -61,8 +61,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const productTitle = `Plano Personalizado (${milhoes}m, ${trajes}t, ${carros}c)`;
 
     const productQuery = await dataSource.query(
-      `INSERT INTO "products" ("title", "description", "price", "deliveryType", "tags", "stock", "createdAt", "updatedAt")
-       VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+      `INSERT INTO "products" ("title", "description", "price", "deliveryType", "tags", "stock", "createdAt")
+       VALUES ($1, $2, $3, $4, $5, $6, NOW())
        RETURNING "id"`,
       [
         productTitle,
