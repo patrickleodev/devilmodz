@@ -379,10 +379,14 @@ export default function AdminDashboard() {
                       {order.product?.tags?.includes("custom:plan") && (
                         <div className="mt-3 flex gap-3 text-xs text-slate-300">
                           {(() => {
-                            const tags = order.product?.tags || [];
-                            const money = tags.find(t => t.startsWith("money:"))?.split(":")[1] || "0";
-                            const clothes = tags.find(t => t.startsWith("clothes:"))?.split(":")[1] || "0";
-                            const cars = tags.find(t => t.startsWith("cars:"))?.split(":")[1] || "0";
+                            const tagsArray = Array.isArray(order.product?.tags) 
+                              ? order.product.tags 
+                              : typeof order.product?.tags === 'string' 
+                                ? order.product.tags.split(',').map(t => t.trim())
+                                : [];
+                            const money = tagsArray.find(t => t.startsWith("money:"))?.split(":")[1] || "0";
+                            const clothes = tagsArray.find(t => t.startsWith("clothes:"))?.split(":")[1] || "0";
+                            const cars = tagsArray.find(t => t.startsWith("cars:"))?.split(":")[1] || "0";
                             return (
                               <>
                                 <span className="rounded-md bg-emerald-500/15 px-2 py-1">💰 {money}M</span>
