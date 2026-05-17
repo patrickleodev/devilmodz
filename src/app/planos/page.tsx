@@ -142,13 +142,13 @@ export default function PlanosPage() {
       </section>
 
       <div className="flex justify-center items-center gap-4">
-        <p className="text-sm font-medium text-slate-950">ou</p>
+        <p className="text-sm text-slate-300">ou</p>
         <Link
           href="/planos-personalizados"
-          className="inline-flex items-center gap-3 rounded-2xl bg-gradient-to-r from-cyan-400 to-emerald-400 px-6 py-3 font-semibold text-slate-950 shadow-lg transition hover:brightness-110"
+          className="inline-flex items-center gap-3 rounded-2xl bg-gradient-to-r from-cyan-400 to-emerald-400 px-6 py-3 font-bold text-slate-950 shadow-lg transition hover:brightness-110"
         >
-          <FiSettings className="h-5 w-5" />
-          Personalizar plano
+          <FiSettings className="h-5 w-5 text-slate-950" />
+          <span className="text-slate-950">Personalizar plano</span>
         </Link>
       </div>
 
