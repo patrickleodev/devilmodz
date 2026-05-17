@@ -146,12 +146,6 @@ export default function AccountPage() {
           </div>
 
           <div className="flex flex-wrap gap-3">
-            <Link
-              href="/cart"
-              className="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-medium text-white transition hover:bg-white/10"
-            >
-              Ir para o carrinho
-            </Link>
             <button
               onClick={() => signOut({ callbackUrl: "/" })}
               className="inline-flex items-center justify-center rounded-2xl bg-rose-500/10 px-5 py-3 text-sm font-medium text-rose-100 transition hover:bg-rose-500/20"
@@ -179,7 +173,7 @@ export default function AccountPage() {
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <p className="text-xs uppercase tracking-[0.28em] text-slate-500">Histórico</p>
-              <h2 className="mt-2 text-2xl font-semibold text-white">Compras recentes</h2>
+              <h2 className="mt-2 text-2xl font-semibold text-white">Histórico de compras</h2>
             </div>
             <p className="text-sm text-slate-400">Pedidos e tickets criados automaticamente após a confirmação.</p>
           </div>
@@ -198,73 +192,116 @@ export default function AccountPage() {
                 Nenhuma compra encontrada ainda.
               </div>
             ) : (
-              orders.map((order) => {
-                const productTitle = order.product?.title || order.product?.name || order.productId;
-                const paymentStatus = order.payment?.status || "pending";
+              (() => {
+                const groups: Record<string, AccountOrder[]> = {};
+                orders.forEach((o) => {
+                  const d = new Date(o.createdAt);
+                  const key = d.toISOString().slice(0, 10);
+                  if (!groups[key]) groups[key] = [];
+                  groups[key].push(o);
+                });
+
+                const sortedKeys = Object.keys(groups).sort((a, b) => (a < b ? 1 : -1));
+
+                const getLabel = (isoDate: string) => {
+                  const d = new Date(isoDate + "T00:00:00");
+                  const today = new Date();
+                  const todayKey = today.toISOString().slice(0, 10);
+                  const yesterday = new Date(today);
+                  yesterday.setDate(today.getDate() - 1);
+                  const yesterdayKey = yesterday.toISOString().slice(0, 10);
+
+                  if (isoDate === todayKey) return "Hoje";
+                  if (isoDate === yesterdayKey) return "Ontem";
+
+                  const diffMs = Number(new Date(today.toDateString())) - Number(new Date(d.toDateString()));
+                  const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+                  if (diffDays > 0 && diffDays < 7) {
+                    return d.toLocaleDateString("pt-BR", { weekday: "long" });
+                  }
+
+                  return d.toLocaleDateString("pt-BR");
+                };
 
                 return (
-                  <article key={order.id} className="rounded-3xl border border-white/10 bg-white/5 p-5">
-                    <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Pedido {order.id.slice(0, 8)}</p>
-                        <h3 className="mt-2 text-lg font-semibold text-white">{productTitle}</h3>
-                        <p className="mt-1 text-sm text-slate-400">Criado em {new Date(order.createdAt).toLocaleString("pt-BR")}</p>
-                      </div>
+                  <div className="space-y-6">
+                    {sortedKeys.map((key) => (
+                      <div key={key}>
+                        <h3 className="mb-3 text-sm font-semibold text-slate-300">{getLabel(key)}</h3>
+                        <div className="space-y-4">
+                          {groups[key].map((order) => {
+                            const productTitle = order.product?.title || order.product?.name || order.productId;
+                            const paymentStatus = order.payment?.status || "pending";
 
-                      <div className="flex flex-wrap gap-2">
-                        <span className="rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-xs font-medium text-cyan-200">
-                          Pedido {order.status}
-                        </span>
-                        <span className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-xs font-medium text-emerald-200">
-                          Pagamento {paymentStatus}
-                        </span>
-                        <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-white">
-                          {money.format(order.amount)}
-                        </span>
-                      </div>
-                    </div>
+                            return (
+                              <article key={order.id} className="rounded-3xl border border-white/10 bg-white/5 p-5">
+                                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                                  <div>
+                                    <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Pedido {order.id.slice(0, 8)}</p>
+                                    <h3 className="mt-2 text-lg font-semibold text-white">{productTitle}</h3>
+                                    <p className="mt-1 text-sm text-slate-400">Criado em {new Date(order.createdAt).toLocaleString("pt-BR")}</p>
+                                  </div>
 
-                    <div className="mt-4 flex flex-col gap-3 sm:flex-row">
-                      <Link
-                        href={`/payment-successful?orderId=${order.id}`}
-                        className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-cyan-400 to-emerald-400 px-4 py-2.5 text-sm font-semibold text-slate-950 transition hover:brightness-110"
-                      >
-                        Acompanhar pedido
-                      </Link>
-                      {order.discordThreadUrl ? (
-                        <a
-                          href={order.discordThreadUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/10"
-                        >
-                          Acessar ticket no Discord
-                        </a>
-                      ) : order.status === "completed" || order.status === "paid" ? (
-                        <>
-                          <button
-                            onClick={() => openTicket(order.id)}
-                            className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-cyan-400 to-emerald-400 px-4 py-2.5 text-sm font-semibold text-slate-950 transition hover:brightness-110"
-                          >
-                            Acessar ticket
-                          </button>
-                          <span className="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-slate-300">
-                            Ticket automático em processamento
-                          </span>
-                        </>
-                      ) : null}
-                      {order.discordThreadUrl ? (
-                        <button
-                          onClick={() => closeTicket(order.id)}
-                          className="ml-2 inline-flex items-center justify-center rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-2.5 text-sm font-semibold text-rose-100 transition hover:bg-rose-500/20"
-                        >
-                          Fechar ticket
-                        </button>
-                      ) : null}
-                    </div>
-                  </article>
+                                  <div className="flex flex-wrap gap-2">
+                                    <span className="rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-xs font-medium text-cyan-200">
+                                      Pedido {order.status}
+                                    </span>
+                                    <span className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-xs font-medium text-emerald-200">
+                                      Pagamento {paymentStatus}
+                                    </span>
+                                    <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-white">
+                                      {money.format(order.amount)}
+                                    </span>
+                                  </div>
+                                </div>
+
+                                <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+                                  <Link
+                                    href={`/payment-successful?orderId=${order.id}`}
+                                    className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-cyan-400 to-emerald-400 px-4 py-2.5 text-sm font-semibold text-slate-950 transition hover:brightness-110"
+                                  >
+                                    Acompanhar pedido
+                                  </Link>
+                                  {order.discordThreadUrl ? (
+                                    <a
+                                      href={order.discordThreadUrl}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/10"
+                                    >
+                                      Acessar ticket no Discord
+                                    </a>
+                                  ) : order.status === "completed" || order.status === "paid" ? (
+                                    <>
+                                      <button
+                                        onClick={() => openTicket(order.id)}
+                                        className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-cyan-400 to-emerald-400 px-4 py-2.5 text-sm font-semibold text-slate-950 transition hover:brightness-110"
+                                      >
+                                        Acessar ticket
+                                      </button>
+                                      <span className="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-slate-300">
+                                        Ticket automático em processamento
+                                      </span>
+                                    </>
+                                  ) : null}
+                                  {order.discordThreadUrl ? (
+                                    <button
+                                      onClick={() => closeTicket(order.id)}
+                                      className="ml-2 inline-flex items-center justify-center rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-2.5 text-sm font-semibold text-rose-100 transition hover:bg-rose-500/20"
+                                    >
+                                      Fechar ticket
+                                    </button>
+                                  ) : null}
+                                </div>
+                              </article>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 );
-              })
+              })()
             )}
           </div>
         </section>
