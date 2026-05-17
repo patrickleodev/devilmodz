@@ -145,9 +145,9 @@ export default function AdminDashboard() {
   };
 
   return (
-    <main className="min-h-screen px-4 py-6 text-white sm:px-6 lg:px-10 lg:py-10">
+    <main className="px-4 py-6 text-white sm:px-6 lg:px-10 lg:py-10">
       <div className="mx-auto flex max-w-7xl flex-col gap-8">
-        <header className="rounded-[28px] border border-white/10 bg-white/5 p-6 backdrop-blur">
+        <header className="rounded-[28px] border border-white/10 bg-white/5 p-6">
           <p className="text-xs uppercase tracking-[0.32em] text-slate-500">Painel admin</p>
           <h1 className="mt-3 text-3xl font-semibold">Gerenciar pedidos, produtos e reembolsos</h1>
           <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-300">

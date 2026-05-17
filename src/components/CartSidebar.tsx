@@ -57,21 +57,19 @@ export default function CartSidebar({ open, onClose }: { open: boolean; onClose:
     }
   };
 
-  if (!open) return null;
-
   return (
-    <div className="fixed inset-0 z-60 flex">
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+    <div className={`fixed inset-0 z-60 flex transition-opacity duration-300 ${open ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"}`}>
+      <div className="absolute inset-0 bg-black/50 transition-opacity duration-300" onClick={onClose} />
 
-      <aside className="ml-auto w-full max-w-md bg-slate-950/95 backdrop-blur border-l border-white/10 p-6">
+      <aside className={`ml-auto w-full max-w-md border-l border-white/10 bg-slate-950 p-6 transition-transform duration-300 ease-out ${open ? "translate-x-0" : "translate-x-full"}`}>
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold">Carrinho</h2>
           <button onClick={onClose} className="rounded-full p-2 hover:bg-white/5">✕</button>
         </div>
 
         {!session ? (
-          <div className="mt-4 rounded-2xl border border-white/10 bg-slate-950/60 p-4">
-            <p>Faça login com Discord para acessar seu carrinho.</p>
+          <div className="mt-4">
+            <p className="text-slate-300">Faça login com Discord para acessar seu carrinho.</p>
             <button onClick={() => signIn("discord")} className="mt-3 w-full rounded-2xl bg-cyan-400 px-4 py-3 font-semibold text-slate-950">Entrar</button>
           </div>
         ) : null}

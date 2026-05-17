@@ -51,41 +51,39 @@ export default function Home() {
             </div>
           </div>
 
-          <div>
-            <div className="rounded-3xl border border-white/6 bg-gradient-to-br from-white/5 to-white/3 p-6 shadow-2xl">
-              <h3 className="mb-4 text-lg font-semibold text-white">Planos Populares</h3>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between rounded-xl bg-white/5 p-3">
-                  <div>
-                    <p className="font-semibold text-white">Pacote Básico</p>
-                    <p className="text-sm text-slate-400">Entrega rápida • Suporte via Discord</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-lg font-semibold text-white">R$19,90</p>
-                    <Link href="/planos" className="mt-2 inline-block text-sm text-cyan-300">Ver opções</Link>
-                  </div>
+          <div className="border-l border-white/10 pl-5">
+            <h3 className="mb-4 text-lg font-semibold text-white">Planos Populares</h3>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                <div>
+                  <p className="font-semibold text-white">Pacote Básico</p>
+                  <p className="text-sm text-slate-400">Entrega rápida • Suporte via Discord</p>
                 </div>
-
-                <div className="flex items-center justify-between rounded-xl bg-white/5 p-3">
-                  <div>
-                    <p className="font-semibold text-white">Pacote Pro</p>
-                    <p className="text-sm text-slate-400">Até 3 sessões • Prioridade no suporte</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-lg font-semibold text-white">R$49,90</p>
-                    <Link href="/planos" className="mt-2 inline-block text-sm text-cyan-300">Ver opções</Link>
-                  </div>
+                <div className="text-right">
+                  <p className="text-lg font-semibold text-white">R$19,90</p>
+                  <Link href="/planos" className="mt-2 inline-block text-sm text-cyan-300">Ver opções</Link>
                 </div>
+              </div>
 
-                <div className="flex items-center justify-between rounded-xl bg-white/5 p-3">
-                  <div>
-                    <p className="font-semibold text-white">Pacote Elite</p>
-                    <p className="text-sm text-slate-400">Entrega prioritária • Acompanhamento dedicado</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-lg font-semibold text-white">R$79,90</p>
-                    <Link href="/planos" className="mt-2 inline-block text-sm text-cyan-300">Ver opções</Link>
-                  </div>
+              <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                <div>
+                  <p className="font-semibold text-white">Pacote Pro</p>
+                  <p className="text-sm text-slate-400">Até 3 sessões • Prioridade no suporte</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-lg font-semibold text-white">R$49,90</p>
+                  <Link href="/planos" className="mt-2 inline-block text-sm text-cyan-300">Ver opções</Link>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pb-1">
+                <div>
+                  <p className="font-semibold text-white">Pacote Elite</p>
+                  <p className="text-sm text-slate-400">Entrega prioritária • Acompanhamento dedicado</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-lg font-semibold text-white">R$79,90</p>
+                  <Link href="/planos" className="mt-2 inline-block text-sm text-cyan-300">Ver opções</Link>
                 </div>
               </div>
             </div>

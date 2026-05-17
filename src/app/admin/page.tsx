@@ -22,7 +22,7 @@ export default function AdminPage() {
   }, [router, session, sessionUser?.roles, status]);
 
   if (status === "loading") {
-    return <main className="min-h-screen px-6 py-10 text-white">Carregando painel...</main>;
+    return <main className="px-6 py-10 text-white">Carregando painel...</main>;
   }
 
   if (!session || !isAdminRole(sessionUser?.roles)) {
