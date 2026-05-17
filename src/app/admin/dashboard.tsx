@@ -242,6 +242,13 @@ export default function AdminDashboard() {
       .map((tag) => tag.replace("feature:", ""))
       .filter(Boolean);
 
+  const normalizeTags = (raw?: string[] | string | null) =>
+    Array.isArray(raw)
+      ? raw
+      : typeof raw === "string"
+      ? raw.split(",").map((t) => t.trim()).filter(Boolean)
+      : [];
+
   const deleteProduct = async (product: AdminProduct) => {
     const confirmed = window.confirm(`Excluir o produto "${product.title}"? Essa acao nao pode ser desfeita.`);
 
@@ -362,7 +369,7 @@ export default function AdminDashboard() {
               <p className="text-sm text-slate-400">Nenhum pedido encontrado.</p>
             ) : (
               orders.map((order) => (
-                <article key={order.id} className={`rounded-2xl border ${order.product?.tags?.includes("custom:plan") ? "border-violet-500/30 bg-violet-500/5" : "border-white/10 bg-slate-950/70"} p-5`}>
+                <article key={order.id} className={`rounded-2xl border ${normalizeTags(order.product?.tags).includes("custom:plan") ? "border-violet-500/30 bg-violet-500/5" : "border-white/10 bg-slate-950/70"} p-5`}>
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                     <div className="min-w-0">
                       <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Pedido {order.id.slice(0, 8)}</p>
@@ -370,21 +377,16 @@ export default function AdminDashboard() {
                         <h2 className="text-xl font-semibold text-white">
                           {order.product?.title || order.product?.id || "Produto removido"}
                         </h2>
-                        {order.product?.tags?.includes("custom:plan") && (
+                        {normalizeTags(order.product?.tags).includes("custom:plan") && (
                           <span className="rounded-full border border-violet-400/30 bg-violet-400/10 px-2 py-1 text-xs font-medium text-violet-300">
                             ⚙️ Personalizado
                           </span>
                         )}
                       </div>
-                      {order.product?.tags?.includes("custom:plan") && (
+                      {normalizeTags(order.product?.tags).includes("custom:plan") && (
                         <div className="mt-3 flex gap-3 text-xs text-slate-300">
                           {(() => {
-                            const rawTags = order.product?.tags;
-                            const tagsArray = Array.isArray(rawTags)
-                              ? rawTags
-                              : typeof rawTags === "string"
-                              ? rawTags.split(",").map((t) => t.trim()).filter(Boolean)
-                              : [];
+                            const tagsArray = normalizeTags(order.product?.tags);
                             const moneyVal = tagsArray.find((t) => t.startsWith("money:"))?.split(":")[1] || "0";
                             const clothes = tagsArray.find((t) => t.startsWith("clothes:"))?.split(":")[1] || "0";
                             const cars = tagsArray.find((t) => t.startsWith("cars:"))?.split(":")[1] || "0";
@@ -683,17 +685,17 @@ export default function AdminDashboard() {
             <div className="grid gap-4 self-start">
               {loading ? (
                 <p className="text-sm text-slate-400">Carregando produtos...</p>
-              ) : products.filter(p => !(p.tags || []).includes("custom:plan")).length === 0 ? (
+              ) : products.filter(p => !normalizeTags(p.tags).includes("custom:plan")).length === 0 ? (
                 <p className="text-sm text-slate-400">Nenhum produto encontrado.</p>
               ) : (
-                products.filter(p => !(p.tags || []).includes("custom:plan")).map((product) => {
+                products.filter(p => !normalizeTags(p.tags).includes("custom:plan")).map((product) => {
                   const isEditingProduct = editingProductId === product.id;
-                  const isCustomPlan = (product.tags || []).includes("custom:plan");
+                  const isCustomPlan = normalizeTags(product.tags).includes("custom:plan");
                   
                   // Extract custom plan details from tags
                   let customPlanDetails = { money: 0, clothes: 0, cars: 0 };
                   if (isCustomPlan) {
-                    (product.tags || []).forEach((tag) => {
+                    normalizeTags(product.tags).forEach((tag) => {
                       if (tag.startsWith("money:")) customPlanDetails.money = parseInt(tag.split(":")[1], 10);
                       if (tag.startsWith("clothes:")) customPlanDetails.clothes = parseInt(tag.split(":")[1], 10);
                       if (tag.startsWith("cars:")) customPlanDetails.cars = parseInt(tag.split(":")[1], 10);
@@ -735,7 +737,7 @@ export default function AdminDashboard() {
                     <div className="mt-4 flex flex-wrap gap-2 text-xs text-slate-300">
                       <span className="rounded-full bg-white/5 px-3 py-1">Estoque: {product.stock}</span>
                       <span className="rounded-full bg-white/5 px-3 py-1">Entrega: {product.deliveryType}</span>
-                      {(product.tags || []).map((tag) => (
+                      {normalizeTags(product.tags).map((tag) => (
                         <span key={tag} className="rounded-full bg-white/5 px-3 py-1">
                           #{tag}
                         </span>
