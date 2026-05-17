@@ -36,7 +36,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         'id', p."id",
         'title', p."title",
         'deliveryType', p."deliveryType",
-        'tags', p."tags"
+        'tags', CASE WHEN p."tags" IS NULL THEN '[]'::json ELSE array_to_json(string_to_array(p."tags", ',')) END
       ) AS "product"
     FROM "orders" o
     LEFT JOIN "users" u ON u."id" = o."userId"

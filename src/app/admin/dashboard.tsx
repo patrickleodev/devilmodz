@@ -379,13 +379,18 @@ export default function AdminDashboard() {
                       {order.product?.tags?.includes("custom:plan") && (
                         <div className="mt-3 flex gap-3 text-xs text-slate-300">
                           {(() => {
-                            const tagsArray = (order.product?.tags as string[]) || [];
-                            const money = tagsArray.find(t => t.startsWith("money:"))?.split(":")[1] || "0";
-                            const clothes = tagsArray.find(t => t.startsWith("clothes:"))?.split(":")[1] || "0";
-                            const cars = tagsArray.find(t => t.startsWith("cars:"))?.split(":")[1] || "0";
+                            const rawTags = order.product?.tags;
+                            const tagsArray = Array.isArray(rawTags)
+                              ? rawTags
+                              : typeof rawTags === "string"
+                              ? rawTags.split(",").map((t) => t.trim()).filter(Boolean)
+                              : [];
+                            const moneyVal = tagsArray.find((t) => t.startsWith("money:"))?.split(":")[1] || "0";
+                            const clothes = tagsArray.find((t) => t.startsWith("clothes:"))?.split(":")[1] || "0";
+                            const cars = tagsArray.find((t) => t.startsWith("cars:"))?.split(":")[1] || "0";
                             return (
                               <>
-                                <span className="rounded-md bg-emerald-500/15 px-2 py-1">💰 {money}M</span>
+                                <span className="rounded-md bg-emerald-500/15 px-2 py-1">💰 {moneyVal}M</span>
                                 <span className="rounded-md bg-cyan-500/15 px-2 py-1">👕 {clothes} trajes</span>
                                 <span className="rounded-md bg-pink-500/15 px-2 py-1">🚗 {cars} carros</span>
                               </>
