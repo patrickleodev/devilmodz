@@ -48,7 +48,7 @@ export default function Header() {
 
   return (
     <>
-      <header className="w-full border-b border-white/10 bg-slate-950/80 backdrop-blur sticky top-0 z-50">
+      <header className="w-full border-b border-white/10 bg-slate-950/95 sticky top-0 z-50">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-2 sm:px-6 lg:px-10">
           {/* Logo */}
           <Link
@@ -105,7 +105,7 @@ export default function Header() {
             {/* Cart button */}
             <button
               onClick={() => { setMenuOpen(false); setCartOpen(true); }}
-              className="rounded-lg px-3 py-2 text-sm font-medium text-slate-300 transition hover:bg-white/5 hover:text-white"
+              className="cursor-pointer rounded-lg px-3 py-2 text-sm font-medium text-slate-300 transition hover:bg-white/5 hover:text-white"
               aria-label="Abrir carrinho"
             >
               🛒
@@ -135,8 +135,8 @@ export default function Header() {
                 </button>
 
                 {profileMenuOpen ? (
-                  <div className="absolute right-0 top-full z-50 mt-2 w-56 rounded-3xl border border-white/10 bg-slate-950/95 p-1.5 shadow-2xl shadow-black/40 backdrop-blur">
-                    <div className="rounded-2xl border border-white/5 bg-white/5 px-3 py-2">
+                  <div className="absolute right-0 top-full z-50 mt-2 w-56 rounded-3xl border border-white/10 bg-slate-950/95 p-3 shadow-2xl shadow-black/40">
+                    <div className="px-1 py-1">
                       <p className="text-xs uppercase tracking-[0.24em] text-slate-500">
                         Conectado como
                       </p>
@@ -145,16 +145,16 @@ export default function Header() {
                       </p>
                     </div>
 
-                    <div className="mt-1.5 flex flex-col gap-1">
+                    <div className="mt-2 flex flex-col gap-1">
                       <Link
-                        href="/account"
+                        href="/perfil"
                         onClick={() => setProfileMenuOpen(false)}
                         className="flex items-center gap-2.5 rounded-2xl px-3 py-2 text-sm font-medium text-slate-200 transition hover:bg-white/5 hover:text-white"
                       >
                         <span className="flex h-7 w-7 items-center justify-center rounded-full bg-cyan-400/10 text-cyan-200">
                           ⚙
                         </span>
-                        Gerenciar conta
+                        Gerenciar perfil
                       </Link>
 
                       <button
@@ -250,7 +250,7 @@ export default function Header() {
                   setMenuOpen(false);
                   setCartOpen(true);
                 }}
-                className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-slate-300 hover:text-white hover:bg-white/5 transition"
+                className="flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-slate-300 hover:text-white hover:bg-white/5 transition"
               >
                 <span className="text-base">🛒</span>
                 <span>Carrinho</span>
@@ -267,12 +267,12 @@ export default function Header() {
                     </p>
                   </div>
                   <Link
-                    href="/account"
+                    href="/perfil"
                     onClick={() => setMenuOpen(false)}
                     className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-slate-300 hover:text-white hover:bg-white/5 transition"
                   >
                     <span className="text-base">⚙</span>
-                    <span>Gerenciar conta</span>
+                    <span>Gerenciar perfil</span>
                   </Link>
                   <button
                     onClick={() => {

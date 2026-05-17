@@ -200,7 +200,7 @@ client.on(Events.GuildMemberAdd, async (member: GuildMember) => {
       try {
         const ch = await client.channels.fetch(order.discordThreadId);
         const appUrl = getAppBaseUrl();
-        const content = `<@${member.id}> Olá! Vimos que você entrou no servidor — seu pedido ${order.id} está com status **${order.status}**. Acompanhe aqui: ${appUrl}/payment-successful?orderId=${order.id}`;
+        const content = `<@${member.id}> Olá! Vimos que você entrou no servidor — seu pedido ${order.id} está com status **${order.status}**. Veja os detalhes aqui: ${appUrl}/perfil?orderId=${order.id}`;
 
         // send message if channel supports sending
         // eslint-disable-next-line @typescript-eslint/no-explicit-any

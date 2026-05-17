@@ -1,17 +1,18 @@
 import { redirect } from "next/navigation";
 
 type PageProps = {
-  searchParams?: Record<string, string | string[] | undefined>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
 
-export default function Page({ searchParams }: PageProps) {
+export default async function Page({ searchParams }: PageProps) {
   const params = new URLSearchParams();
-  const orderId = searchParams?.orderId;
+  const resolvedSearchParams = await searchParams;
+  const orderId = resolvedSearchParams?.orderId;
 
   if (typeof orderId === "string" && orderId) {
     params.set("orderId", orderId);
   }
 
   const query = params.toString();
-  redirect(query ? `/payment-successful?${query}` : "/payment-successful");
+  redirect(query ? `/perfil?${query}` : "/perfil");
 }
