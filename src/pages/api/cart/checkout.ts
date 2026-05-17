@@ -92,6 +92,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     await paymentRepo.save(paymentRepo.create({ orderId: firstOrderId || "", provider: "infinitepay", providerPaymentId: checkoutRes.id || "", status: "pending", rawPayload: checkoutRes }));
 
+    // Clear the cart after checkout
+    await cartRepo.delete({ userId: dbUser.id });
+
     const paymentUrl = checkoutRes.url || checkoutRes.link || (checkoutRes.slug ? `https://checkout.infinitepay.io/${handle}/${checkoutRes.slug}` : undefined);
 
     return res.status(200).json({ orderIds: createdOrders, provider: "infinitepay", paymentUrl, initPoint: paymentUrl });
