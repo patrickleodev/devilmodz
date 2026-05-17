@@ -22,16 +22,71 @@ type AccountOrder = {
   } | null;
 };
 
+const ORDERS_PER_PAGE = 15;
+
+const DEMO_PRODUCTS = [
+  { title: "Pacote Starter", amount: 29.9 },
+  { title: "Pacote Pro", amount: 59.9 },
+  { title: "Pacote Elite", amount: 99.9 },
+  { title: "Conta Premium", amount: 149.9 },
+];
+
+const buildDemoOrders = (count = 45): AccountOrder[] => {
+  const now = new Date();
+  const statuses = ["completed", "paid", "processing", "pending"];
+  const paymentStatuses = ["paid", "approved", "pending", "pending"];
+
+  return Array.from({ length: count }, (_, index) => {
+    const dayOffset = index;
+    const timestamp = new Date(now);
+    timestamp.setDate(now.getDate() - dayOffset);
+    timestamp.setHours(10 + (index % 8), (index * 7) % 60, 0, 0);
+
+    const product = DEMO_PRODUCTS[index % DEMO_PRODUCTS.length];
+
+    return {
+      id: `demo-${String(index + 1).padStart(4, "0")}`,
+      status: statuses[index % statuses.length],
+      amount: product.amount + (index % 3) * 10,
+      createdAt: timestamp.toISOString(),
+      productId: `demo-product-${index % DEMO_PRODUCTS.length}`,
+      discordThreadUrl: index % 6 === 0 ? `https://discord.com/channels/demo/${index + 1}` : null,
+      product: {
+        id: `demo-product-${index % DEMO_PRODUCTS.length}`,
+        title: product.title,
+      },
+      payment: {
+        status: paymentStatuses[index % paymentStatuses.length],
+        provider: "demo",
+      },
+    };
+  });
+};
+
 export default function AccountPage() {
   const { data: session, status } = useSession();
   const [orders, setOrders] = useState<AccountOrder[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [ordersError, setOrdersError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
 
   const money = useMemo(
     () => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }),
     []
   );
+
+  const displayOrders = useMemo(() => {
+    const hasRealOrders = orders.length > 0;
+
+    if (hasRealOrders) return orders;
+
+    // Fallback para teste visual da página e paginação
+    return buildDemoOrders(45);
+  }, [orders]);
+
+  const totalPages = Math.max(1, Math.ceil(displayOrders.length / ORDERS_PER_PAGE));
+  const safePage = Math.min(page, totalPages);
+  const pageOrders = displayOrders.slice((safePage - 1) * ORDERS_PER_PAGE, safePage * ORDERS_PER_PAGE);
 
   useEffect(() => {
     if (!session?.user) return;
@@ -58,6 +113,10 @@ export default function AccountPage() {
 
     void loadOrders();
   }, [session?.user]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [session?.user, orders.length]);
 
   const openTicket = async (orderId: string) => {
     try {
@@ -187,14 +246,10 @@ export default function AccountPage() {
               <div className="rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
                 {ordersError}
               </div>
-            ) : orders.length === 0 ? (
-              <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-300">
-                Nenhuma compra encontrada ainda.
-              </div>
             ) : (
               (() => {
                 const groups: Record<string, AccountOrder[]> = {};
-                orders.forEach((o) => {
+                pageOrders.forEach((o) => {
                   const d = new Date(o.createdAt);
                   const key = d.toISOString().slice(0, 10);
                   if (!groups[key]) groups[key] = [];
@@ -225,6 +280,12 @@ export default function AccountPage() {
 
                 return (
                   <div className="space-y-6">
+                    {!orders.length ? (
+                      <div className="rounded-2xl border border-cyan-400/20 bg-cyan-400/10 px-4 py-3 text-sm text-cyan-100">
+                        Exibindo pedidos fictícios para teste da paginação.
+                      </div>
+                    ) : null}
+
                     {sortedKeys.map((key) => (
                       <div key={key}>
                         <h3 className="mb-3 text-sm font-semibold text-slate-300">{getLabel(key)}</h3>
@@ -303,6 +364,29 @@ export default function AccountPage() {
                 );
               })()
             )}
+          </div>
+
+          <div className="mt-6 flex flex-col gap-3 border-t border-white/10 pt-5 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-slate-400">
+              Página {safePage} de {totalPages} · {displayOrders.length} pedidos
+            </p>
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => setPage((current) => Math.max(1, current - 1))}
+                disabled={safePage <= 1}
+                className="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Anterior
+              </button>
+              <button
+                onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+                disabled={safePage >= totalPages}
+                className="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Próxima
+              </button>
+            </div>
           </div>
         </section>
       </section>
