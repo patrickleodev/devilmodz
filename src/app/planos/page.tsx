@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { FiSettings } from "react-icons/fi";
 import { signIn, useSession } from "next-auth/react";
 import type { StoreProduct } from "@/lib/catalog";
 
@@ -140,12 +141,14 @@ export default function PlanosPage() {
         )}
       </section>
 
-      <div className="flex justify-center">
+      <div className="flex justify-center items-center gap-4">
+        <p className="text-sm text-slate-300">ou</p>
         <Link
           href="/planos-personalizados"
-          className="inline-flex items-center rounded-2xl bg-gradient-to-r from-cyan-400 to-emerald-400 px-6 py-3 font-semibold text-slate-950 shadow-lg transition hover:brightness-110"
+          className="inline-flex items-center gap-3 rounded-2xl bg-gradient-to-r from-cyan-400 to-emerald-400 px-6 py-3 font-semibold text-slate-950 shadow-lg transition hover:brightness-110"
         >
-          🎨 Personalizar plano
+          <FiSettings className="h-5 w-5" />
+          Personalizar plano
         </Link>
       </div>
 

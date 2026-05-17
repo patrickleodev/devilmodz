@@ -1,16 +1,18 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { createCustomInfinitePayCheckout } from "@/lib/infinitepay";
 
-const MIN_MILHOES = 30;
+const MIN_MILHOES = 0;
 const MAX_MILHOES = 3000;
 const STEP_MILHOES = 30;
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") return res.status(405).end();
-  const { milhoes } = req.body;
+  const { milhoes, trajes, carros } = req.body;
   const milhoesValue = Number(milhoes);
+  const trajesValue = Number(trajes || 0);
+  const carrosValue = Number(carros || 0);
 
-  if (!Number.isFinite(milhoesValue)) {
+  if (!Number.isFinite(milhoesValue) || !Number.isFinite(trajesValue)) {
     return res.status(400).json({ error: "Quantidade de milhões inválida" });
   }
 
@@ -19,8 +21,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const PRICE_PER_STEP = 14.9;
-  const total = (milhoesValue / STEP_MILHOES) * PRICE_PER_STEP;
-  const label = `Plano Personalizado - ${milhoesValue.toLocaleString("pt-BR")} milhões`;
+  const PRICE_PER_TRAJE = 0.95;
+  const PRICE_PER_CARRO = 2.9;
+  if (trajesValue < 0 || trajesValue > 100) {
+    return res.status(400).json({ error: "Trajes inválidos (0-100)" });
+  }
+  if (carrosValue < 0 || carrosValue > 200) {
+    return res.status(400).json({ error: "Carros inválidos (0-200)" });
+  }
+  const milhoesSubtotal = (milhoesValue / STEP_MILHOES) * PRICE_PER_STEP;
+  const trajesSubtotal = trajesValue * PRICE_PER_TRAJE;
+  const carrosSubtotal = carrosValue * PRICE_PER_CARRO;
+  const total = milhoesSubtotal + trajesSubtotal + carrosSubtotal;
+  const label = `Plano Personalizado`;
+
+  // Valor mínimo para criar checkout (R$2.00)
+  if (total < 2) {
+    return res.status(400).json({ error: "Valor mínimo para checkout é R$2,00" });
+  }
 
   // Cria o checkout na InfinitePay
   try {

@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { FiEdit2, FiEye, FiX, FiSave, FiRefreshCw } from "react-icons/fi";
 
 type AdminProduct = {
   id: string;
@@ -35,6 +37,15 @@ type AdminUser = {
   lastOrderAt?: string | null;
 };
 
+type ProductPreviewSource = {
+  title: string;
+  description: string;
+  price: number;
+  stock: number;
+  deliveryType: string;
+  tags: string[];
+};
+
 const emptyProductForm = {
   title: "",
   description: "",
@@ -52,6 +63,7 @@ export default function AdminDashboard() {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [productForm, setProductForm] = useState(emptyProductForm);
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
+  const [previewProduct, setPreviewProduct] = useState<AdminProduct | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionState, setActionState] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -116,6 +128,29 @@ export default function AdminDashboard() {
     setEditingProductId(null);
   };
 
+  const restoreProducts = async () => {
+    const confirmed = window.confirm("Restaurar produtos vai remover todos os personalizados e manter apenas os 3 do seed. Continuar?");
+    if (!confirmed) return;
+
+    setActionState("restore-products");
+    setMessage(null);
+
+    try {
+      const res = await fetch("/api/admin/products/restore", { method: "POST" });
+      if (!res.ok) {
+        const payload = await res.json();
+        throw new Error(payload.error || "Falha ao restaurar produtos");
+      }
+
+      await loadData();
+      setMessage("Produtos restaurados com sucesso.");
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Erro inesperado");
+    } finally {
+      setActionState(null);
+    }
+  };
+
   const buildProductPayload = () => ({
     title: productForm.title,
     description: productForm.description,
@@ -168,6 +203,44 @@ export default function AdminDashboard() {
     setEditingProductId(product.id);
     setMessage(null);
   };
+
+  const buildPreviewSource = (source: { title: string; description: string; price: string | number; stock: string | number; deliveryType: string; tags: string }) => ({
+    title: source.title,
+    description: source.description,
+    price: Number(String(source.price).replace(",", ".") || 0),
+    stock: Number(source.stock || 0),
+    deliveryType: source.deliveryType,
+    tags: source.tags
+      .split(",")
+      .map((tag) => tag.trim())
+      .filter(Boolean),
+  });
+
+  const previewFromForm = buildPreviewSource(productForm);
+
+  const previewBadge = (product: ProductPreviewSource) => {
+    const badgeTag = (product.tags || []).find((tag) => tag.startsWith("badge:"));
+    if (badgeTag) {
+      return badgeTag.replace("badge:", "");
+    }
+
+    return (product.tags || [])[0] || "Preview";
+  };
+
+  const previewSlug = (product: ProductPreviewSource) => {
+    const planTag = (product.tags || []).find((tag) => tag.startsWith("plan:"));
+    if (planTag) {
+      return planTag.replace("plan:", "");
+    }
+
+    return product.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  };
+
+  const previewFeatures = (product: ProductPreviewSource) =>
+    (product.tags || [])
+      .filter((tag) => tag.startsWith("feature:"))
+      .map((tag) => tag.replace("feature:", ""))
+      .filter(Boolean);
 
   const deleteProduct = async (product: AdminProduct) => {
     const confirmed = window.confirm(`Excluir o produto "${product.title}"? Essa acao nao pode ser desfeita.`);
@@ -270,7 +343,7 @@ export default function AdminDashboard() {
               key={view}
               type="button"
               onClick={() => setActiveView(view as "orders" | "clients" | "products")}
-              className={`rounded-2xl px-4 py-2 text-sm font-semibold transition ${
+                  className={`cursor-pointer rounded-2xl px-4 py-2 text-sm font-semibold transition ${
                 activeView === view
                   ? "bg-cyan-300 text-slate-950"
                   : "border border-white/10 bg-white/5 text-slate-200 hover:bg-white/10"
@@ -315,7 +388,7 @@ export default function AdminDashboard() {
                       value={order.status}
                       onChange={(event) => updateOrder(order.id, { status: event.target.value })}
                       disabled={isBusy(order.id)}
-                      className="rounded-2xl border border-white/10 bg-slate-900 px-4 py-2 text-sm text-white outline-none disabled:cursor-not-allowed disabled:opacity-60"
+                      className="cursor-pointer rounded-2xl border border-white/10 bg-slate-900 px-4 py-2 text-sm text-white outline-none disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       {statusOptions.map((status) => (
                         <option key={status} value={status}>
@@ -326,14 +399,14 @@ export default function AdminDashboard() {
                     <button
                       onClick={() => updateOrder(order.id, { action: "deliver" })}
                       disabled={isBusy(order.id)}
-                      className="rounded-2xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-2 text-sm font-medium text-emerald-100 transition hover:bg-emerald-400/20 disabled:cursor-not-allowed disabled:opacity-60"
+                      className="cursor-pointer rounded-2xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-2 text-sm font-medium text-emerald-100 transition hover:bg-emerald-400/20 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       Entregar
                     </button>
                     <button
                       onClick={() => updateOrder(order.id, { action: "refund" })}
                       disabled={isBusy(order.id)}
-                      className="rounded-2xl border border-rose-400/20 bg-rose-400/10 px-4 py-2 text-sm font-medium text-rose-100 transition hover:bg-rose-400/20 disabled:cursor-not-allowed disabled:opacity-60"
+                      className="cursor-pointer rounded-2xl border border-rose-400/20 bg-rose-400/10 px-4 py-2 text-sm font-medium text-rose-100 transition hover:bg-rose-400/20 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       Reembolsar
                     </button>
@@ -350,7 +423,7 @@ export default function AdminDashboard() {
                         <button
                           onClick={() => updateOrder(order.id, { action: "close-ticket" })}
                           disabled={isBusy(order.id)}
-                          className="rounded-2xl border border-amber-400/20 bg-amber-400/10 px-4 py-2 text-sm font-medium text-amber-100 transition hover:bg-amber-400/20 disabled:cursor-not-allowed disabled:opacity-60"
+                          className="cursor-pointer rounded-2xl border border-amber-400/20 bg-amber-400/10 px-4 py-2 text-sm font-medium text-amber-100 transition hover:bg-amber-400/20 disabled:cursor-not-allowed disabled:opacity-60"
                         >
                           Encerrar ticket
                         </button>
@@ -359,7 +432,7 @@ export default function AdminDashboard() {
                       <button
                         onClick={() => updateOrder(order.id, { action: "open-ticket" })}
                         disabled={isBusy(order.id)}
-                        className="rounded-2xl border border-cyan-400/20 bg-cyan-400/10 px-4 py-2 text-sm font-medium text-cyan-100 transition hover:bg-cyan-400/20 disabled:cursor-not-allowed disabled:opacity-60"
+                          className="cursor-pointer rounded-2xl border border-cyan-400/20 bg-cyan-400/10 px-4 py-2 text-sm font-medium text-cyan-100 transition hover:bg-cyan-400/20 disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         Criar ticket
                       </button>
@@ -404,10 +477,31 @@ export default function AdminDashboard() {
         ) : null}
 
         {activeView === "products" ? (
-          <section className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
+          <section className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr] xl:items-start">
             <div className="rounded-2xl border border-white/10 bg-slate-950/70 p-5">
-              <p className="text-xs uppercase tracking-[0.28em] text-slate-500">Catalogo</p>
-              <h2 className="mt-2 text-2xl font-semibold">{editingProductId ? "Editar produto" : "Criar produto"}</h2>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.28em] text-slate-500">Catalogo</p>
+                  <h2 className="mt-2 text-2xl font-semibold">{editingProductId ? "Editar produto" : "Criar produto"}</h2>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Link
+                    href="/planos"
+                    className="inline-flex items-center gap-2 rounded-2xl bg-cyan-400 px-3 py-2 text-sm font-medium text-slate-950 transition hover:brightness-110"
+                  >
+                    Ver produtos
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={restoreProducts}
+                    disabled={Boolean(actionState)}
+                    className="cursor-pointer inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-slate-200 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <FiRefreshCw className="h-4 w-4" aria-hidden="true" />
+                    Restaurar produtos
+                  </button>
+                </div>
+              </div>
 
               <div className="mt-5 grid gap-3">
                 <label className="grid gap-2 text-sm font-medium text-slate-200">
@@ -476,37 +570,102 @@ export default function AdminDashboard() {
                 <button
                   onClick={saveProduct}
                   disabled={Boolean(actionState)}
-                  className="inline-flex flex-1 justify-center rounded-2xl bg-gradient-to-r from-cyan-400 to-emerald-400 px-5 py-3 font-semibold text-slate-950 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="cursor-pointer inline-flex flex-1 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-cyan-400 to-emerald-400 px-5 py-3 font-semibold text-slate-950 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {actionState?.includes(":save")
                     ? "Salvando..."
-                    : actionState === "create-product"
-                      ? "Criando..."
-                      : editingProductId
-                        ? "Salvar alteracoes"
-                        : "Salvar produto"}
+                    : (
+                      <>
+                        <FiSave className="h-4 w-4" aria-hidden="true" />
+                        {actionState === "create-product"
+                          ? "Criando..."
+                          : editingProductId
+                            ? "Salvar alteracoes"
+                            : "Salvar produto"}
+                      </>
+                    )}
                 </button>
                 {editingProductId ? (
                   <button
                     type="button"
                     onClick={resetProductForm}
                     disabled={Boolean(actionState)}
-                    className="rounded-2xl border border-white/10 bg-white/5 px-5 py-3 font-semibold text-slate-200 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="cursor-pointer rounded-2xl border border-white/10 bg-white/5 px-5 py-3 font-semibold text-slate-200 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
                   >
+                    <FiX className="h-4 w-4 inline-block mr-2" aria-hidden="true" />
                     Cancelar
                   </button>
                 ) : null}
               </div>
+
+              <div className="mt-6 rounded-[28px] border border-white/10 bg-slate-950/70 p-4 sm:p-5">
+                <div className="flex items-center justify-between gap-3 border-b border-white/10 pb-4">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.28em] text-slate-500">Preview em tempo real</p>
+                    <h3 className="mt-2 text-lg font-semibold text-white">Como o produto vai aparecer</h3>
+                  </div>
+                  <span className="text-xs uppercase tracking-[0.3em] text-slate-500">{previewSlug(previewFromForm)}</span>
+                </div>
+
+                <article className="mt-4 rounded-[28px] border border-white/10 bg-slate-950/70 p-5 shadow-xl shadow-black/20">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-xs font-medium text-cyan-200">
+                      {previewBadge(previewFromForm)}
+                    </span>
+                    <span className="text-xs uppercase tracking-[0.3em] text-slate-500">{previewSlug(previewFromForm)}</span>
+                  </div>
+
+                  <h4 className="mt-6 text-2xl font-semibold text-white">{previewFromForm.title || "Nome do produto"}</h4>
+                  <p className="mt-3 text-sm leading-6 text-slate-400">
+                    {previewFromForm.description || "Descreva o que o cliente recebe, prazo e atendimento incluso."}
+                  </p>
+
+                  <ul className="mt-6 space-y-3 text-sm text-slate-300">
+                    {(previewFeatures(previewFromForm).length > 0
+                      ? previewFeatures(previewFromForm)
+                      : ["Execucao prioritaria", "Gerenciamento completo", "Acompanhamento dedicado"]
+                    ).map((feature) => (
+                      <li key={feature} className="flex items-center gap-3">
+                        <span className="h-2 w-2 rounded-full bg-emerald-400" />
+                        {feature}
+                      </li>
+                    ))}
+                  </ul>
+
+                  <div className="mt-8 space-y-4">
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.24em] text-slate-500">A partir de</p>
+                      <p className="mt-1 text-3xl font-semibold text-white">
+                        {previewFromForm.price > 0 ? money.format(previewFromForm.price) : "R$ 0,00"}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      disabled
+                      className="inline-flex w-full cursor-default items-center justify-center whitespace-nowrap rounded-2xl bg-gradient-to-r from-cyan-400 to-emerald-400 px-5 py-3 font-semibold text-slate-950 opacity-90"
+                    >
+                      Comprar agora
+                    </button>
+                  </div>
+                </article>
+              </div>
             </div>
 
-            <div className="grid gap-4">
+            <div className="grid gap-4 self-start">
               {loading ? (
                 <p className="text-sm text-slate-400">Carregando produtos...</p>
               ) : products.length === 0 ? (
                 <p className="text-sm text-slate-400">Nenhum produto encontrado.</p>
               ) : (
-                products.map((product) => (
-                  <article key={product.id} className="rounded-2xl border border-white/10 bg-slate-950/70 p-5">
+                products.map((product) => {
+                  const isEditingProduct = editingProductId === product.id;
+                  return (
+                  <article
+                    key={product.id}
+                    className={`rounded-2xl border border-white/10 bg-slate-950/70 p-4 ${
+                      isEditingProduct ? "opacity-60 grayscale pointer-events-none" : ""
+                    }`}
+                  >
                     <div className="flex items-start justify-between gap-4">
                       <div>
                         <h3 className="text-lg font-semibold text-white">{product.title}</h3>
@@ -525,29 +684,105 @@ export default function AdminDashboard() {
                         </span>
                       ))}
                     </div>
-                    <div className="mt-5 flex flex-wrap gap-2">
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setPreviewProduct(product)}
+                        disabled={Boolean(actionState)}
+                        className="cursor-pointer inline-flex items-center gap-2 rounded-2xl border border-emerald-400/20 bg-emerald-400/10 px-3 py-2 text-sm font-medium text-emerald-100 transition hover:bg-emerald-400/20 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        <FiEye className="h-4 w-4" aria-hidden="true" />
+                        Ver preview
+                      </button>
                       <button
                         type="button"
                         onClick={() => editProduct(product)}
                         disabled={Boolean(actionState)}
-                        className="rounded-2xl border border-cyan-400/20 bg-cyan-400/10 px-4 py-2 text-sm font-medium text-cyan-100 transition hover:bg-cyan-400/20 disabled:cursor-not-allowed disabled:opacity-60"
+                        className="cursor-pointer inline-flex items-center gap-2 rounded-2xl border border-cyan-400/20 bg-cyan-400/10 px-3 py-2 text-sm font-medium text-cyan-100 transition hover:bg-cyan-400/20 disabled:cursor-not-allowed disabled:opacity-60"
                       >
+                        <FiEdit2 className="h-4 w-4" aria-hidden="true" />
                         Editar
                       </button>
                       <button
                         type="button"
                         onClick={() => deleteProduct(product)}
                         disabled={Boolean(actionState)}
-                        className="rounded-2xl border border-rose-400/20 bg-rose-400/10 px-4 py-2 text-sm font-medium text-rose-100 transition hover:bg-rose-400/20 disabled:cursor-not-allowed disabled:opacity-60"
+                        className="cursor-pointer inline-flex items-center gap-2 rounded-2xl border border-rose-400/20 bg-rose-400/10 px-3 py-2 text-sm font-medium text-rose-100 transition hover:bg-rose-400/20 disabled:cursor-not-allowed disabled:opacity-60"
                       >
+                        <FiX className="h-4 w-4" aria-hidden="true" />
                         {actionState === `product:${product.id}:delete` ? "Excluindo..." : "Excluir"}
                       </button>
                     </div>
                   </article>
-                ))
+                )})
               )}
             </div>
           </section>
+        ) : null}
+
+        {previewProduct ? (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 px-4 py-6 backdrop-blur-sm">
+            <div
+              className="absolute inset-0"
+              aria-hidden="true"
+              onClick={() => setPreviewProduct(null)}
+            />
+            <section className="relative z-10 w-full max-w-2xl rounded-[28px] border border-white/10 bg-slate-950 p-4 shadow-2xl shadow-black/40 sm:p-6">
+              <div className="flex items-center justify-between gap-3 border-b border-white/10 pb-4">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.28em] text-slate-500">Preview do plano</p>
+                  <h2 className="mt-2 text-xl font-semibold text-white">Como vai aparecer na vitrine</h2>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPreviewProduct(null)}
+                  aria-label="Fechar preview"
+                  className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-white/5 text-slate-200 transition hover:bg-white/10"
+                >
+                  <FiX className="h-4 w-4" aria-hidden="true" />
+                </button>
+              </div>
+
+              <article className="mt-5 rounded-[28px] border border-white/10 bg-slate-950/70 p-6 shadow-xl shadow-black/20">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-xs font-medium text-cyan-200">
+                    {previewBadge(previewProduct)}
+                  </span>
+                  <span className="text-xs uppercase tracking-[0.3em] text-slate-500">
+                    {previewSlug(previewProduct)}
+                  </span>
+                </div>
+
+                <h3 className="mt-6 text-2xl font-semibold text-white">{previewProduct.title}</h3>
+                <p className="mt-3 text-sm leading-6 text-slate-400">{previewProduct.description}</p>
+
+                <ul className="mt-6 space-y-3 text-sm text-slate-300">
+                  {(previewFeatures(previewProduct).length > 0 ? previewFeatures(previewProduct) : ["Execucao prioritaria", "Gerenciamento completo", "Acompanhamento dedicado"]).map(
+                    (feature) => (
+                      <li key={feature} className="flex items-center gap-3">
+                        <span className="h-2 w-2 rounded-full bg-emerald-400" />
+                        {feature}
+                      </li>
+                    ),
+                  )}
+                </ul>
+
+                <div className="mt-8 space-y-4">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.24em] text-slate-500">A partir de</p>
+                    <p className="mt-1 text-3xl font-semibold text-white">{money.format(previewProduct.price)}</p>
+                  </div>
+                  <button
+                    type="button"
+                    disabled
+                    className="inline-flex w-full cursor-default items-center justify-center whitespace-nowrap rounded-2xl bg-gradient-to-r from-cyan-400 to-emerald-400 px-5 py-3 font-semibold text-slate-950 opacity-90"
+                  >
+                    Comprar agora
+                  </button>
+                </div>
+              </article>
+            </section>
+          </div>
         ) : null}
       </div>
     </main>
