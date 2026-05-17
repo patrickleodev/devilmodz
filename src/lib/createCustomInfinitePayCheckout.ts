@@ -1,23 +1,13 @@
 import { createCheckoutLink, getAppBaseUrl, LinkResponse } from "./infinitepay";
-import { PLAN_OPTIONS as OPTIONS } from "./planosOptions";
 
-export async function createCustomInfinitePayCheckout(total: number, opcoes: string[]): Promise<string> {
-  // Monta os itens do checkout a partir das opções selecionadas
-  const items = opcoes.map((id) => {
-    const found = OPTIONS.find((o) => o.id === id);
-    const price = found ? found.valor : Math.round(total);
-    const description = found ? found.label : "Plano Personalizado";
-    return {
+export async function createCustomInfinitePayCheckout(total: number, description: string): Promise<string> {
+  const items = [
+    {
       quantity: 1,
-      price: Math.round(price * 100), // centavos
+      price: Math.round(total * 100),
       description,
-    };
-  });
-
-  if (items.length === 0) {
-    // fallback: single item with total
-    items.push({ quantity: 1, price: Math.round(total * 100), description: "Plano Personalizado" });
-  }
+    },
+  ];
 
   const handle = process.env.INFINITEPAY_TAG;
   if (!handle) throw new Error("INFINITEPAY_TAG is not configured");
