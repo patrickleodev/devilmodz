@@ -598,8 +598,8 @@ export default function AdminDashboard() {
                 ) : null}
               </div>
 
-              <div className="mt-6 rounded-[28px] border border-white/10 bg-slate-950/70 p-4 sm:p-5">
-                <div className="flex items-center justify-between gap-3 border-b border-white/10 pb-4">
+              <div className="mt-6">
+                <div className="flex items-center justify-between gap-3 pb-4">
                   <div>
                     <p className="text-xs uppercase tracking-[0.28em] text-slate-500">Preview em tempo real</p>
                     <h3 className="mt-2 text-lg font-semibold text-white">Como o produto vai aparecer</h3>
@@ -607,7 +607,7 @@ export default function AdminDashboard() {
                   <span className="text-xs uppercase tracking-[0.3em] text-slate-500">{previewSlug(previewFromForm)}</span>
                 </div>
 
-                <article className="mt-4 rounded-[28px] border border-white/10 bg-slate-950/70 p-5 shadow-xl shadow-black/20">
+                <article className="mt-4 rounded-[28px] border border-white/10 bg-slate-950/70 p-4 sm:p-5 shadow-xl shadow-black/20">
                   <div className="flex items-center justify-between gap-3">
                     <span className="rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-xs font-medium text-cyan-200">
                       {previewBadge(previewFromForm)}
@@ -728,7 +728,7 @@ export default function AdminDashboard() {
               onClick={() => setPreviewProduct(null)}
             />
             <section className="relative z-10 w-full max-w-2xl rounded-[28px] border border-white/10 bg-slate-950 p-4 shadow-2xl shadow-black/40 sm:p-6">
-              <div className="flex items-center justify-between gap-3 border-b border-white/10 pb-4">
+              <div className="flex items-center justify-between gap-3 pb-4">
                 <div>
                   <p className="text-xs uppercase tracking-[0.28em] text-slate-500">Preview do plano</p>
                   <h2 className="mt-2 text-xl font-semibold text-white">Como vai aparecer na vitrine</h2>
@@ -743,7 +743,7 @@ export default function AdminDashboard() {
                 </button>
               </div>
 
-              <article className="mt-5 rounded-[28px] border border-white/10 bg-slate-950/70 p-6 shadow-xl shadow-black/20">
+              <article className="mt-5 p-6">
                 <div className="flex items-center justify-between gap-3">
                   <span className="rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-xs font-medium text-cyan-200">
                     {previewBadge(previewProduct)}
