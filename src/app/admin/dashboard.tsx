@@ -77,9 +77,11 @@ export default function AdminDashboard() {
       .reduce((sum, order) => sum + Number(order.amount || 0), 0);
     const openTickets = orders.filter((order) => Boolean(order.discordThreadUrl)).length;
 
+    const nonCustomProductsCount = products.filter((p) => !normalizeTags(p.tags).includes("custom:plan")).length;
+
     return {
       clients: users.length,
-      products: products.length,
+      products: nonCustomProductsCount,
       orders: orders.length,
       paidRevenue,
       openTickets,
@@ -685,96 +687,134 @@ export default function AdminDashboard() {
             <div className="grid gap-4 self-start">
               {loading ? (
                 <p className="text-sm text-slate-400">Carregando produtos...</p>
-              ) : products.filter(p => !normalizeTags(p.tags).includes("custom:plan")).length === 0 ? (
-                <p className="text-sm text-slate-400">Nenhum produto encontrado.</p>
-              ) : (
-                products.filter(p => !normalizeTags(p.tags).includes("custom:plan")).map((product) => {
-                  const isEditingProduct = editingProductId === product.id;
-                  const isCustomPlan = normalizeTags(product.tags).includes("custom:plan");
-                  
-                  // Extract custom plan details from tags
-                  let customPlanDetails = { money: 0, clothes: 0, cars: 0 };
-                  if (isCustomPlan) {
-                    normalizeTags(product.tags).forEach((tag) => {
-                      if (tag.startsWith("money:")) customPlanDetails.money = parseInt(tag.split(":")[1], 10);
-                      if (tag.startsWith("clothes:")) customPlanDetails.clothes = parseInt(tag.split(":")[1], 10);
-                      if (tag.startsWith("cars:")) customPlanDetails.cars = parseInt(tag.split(":")[1], 10);
-                    });
-                  }
-                  
-                  return (
-                  <article
-                    key={product.id}
-                    className={`rounded-2xl border ${
-                      isCustomPlan ? "border-violet-500/30 bg-violet-500/5" : "border-white/10 bg-slate-950/70"
-                    } p-4 ${
-                      isEditingProduct ? "opacity-60 grayscale pointer-events-none" : ""
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <h3 className="text-lg font-semibold text-white">{product.title}</h3>
-                          {isCustomPlan && (
-                            <span className="rounded-full border border-violet-400/30 bg-violet-400/10 px-2 py-1 text-xs font-medium text-violet-300">
-                              ⚙️ Personalizado
-                            </span>
-                          )}
+              ) : (() => {
+                const nonCustomProducts = products.filter((p) => !normalizeTags(p.tags).includes("custom:plan"));
+                const customProducts = products.filter((p) => normalizeTags(p.tags).includes("custom:plan"));
+
+                if (nonCustomProducts.length === 0 && customProducts.length === 0) {
+                  return <p className="text-sm text-slate-400">Nenhum produto encontrado.</p>;
+                }
+
+                return (
+                  <>
+                    {customProducts.length > 0 && (
+                      <div className="rounded-2xl border border-violet-500/20 bg-violet-500/5 p-4">
+                        <p className="text-xs uppercase tracking-[0.24em] text-violet-200">Planos personalizados</p>
+                        <div className="mt-3 grid gap-3">
+                          {customProducts.map((product) => {
+                            const customPlanDetails = { money: 0, clothes: 0, cars: 0 };
+                            normalizeTags(product.tags).forEach((tag) => {
+                              if (tag.startsWith("money:")) customPlanDetails.money = parseInt((tag.split(":")[1] || "0"), 10);
+                              if (tag.startsWith("clothes:")) customPlanDetails.clothes = parseInt((tag.split(":")[1] || "0"), 10);
+                              if (tag.startsWith("cars:")) customPlanDetails.cars = parseInt((tag.split(":")[1] || "0"), 10);
+                            });
+
+                            return (
+                              <article key={product.id} className="rounded-2xl border border-violet-500/30 bg-violet-500/5 p-3">
+                                <div className="flex items-center justify-between">
+                                  <div>
+                                    <h4 className="text-sm font-semibold text-white">{product.title}</h4>
+                                    <p className="text-xs text-slate-300">{product.description}</p>
+                                  </div>
+                                  <div className="text-right text-xs text-slate-300">
+                                    <div>💰 {customPlanDetails.money}M</div>
+                                    <div>👕 {customPlanDetails.clothes}</div>
+                                    <div>🚗 {customPlanDetails.cars}</div>
+                                  </div>
+                                </div>
+                              </article>
+                            );
+                          })}
                         </div>
-                        <p className="mt-2 text-sm leading-6 text-slate-400">{product.description}</p>
-                        {isCustomPlan && (
-                          <div className="mt-3 flex gap-3 text-xs text-slate-300">
-                            <span className="rounded-md bg-emerald-500/15 px-2 py-1">💰 {customPlanDetails.money}M</span>
-                            <span className="rounded-md bg-cyan-500/15 px-2 py-1">👕 {customPlanDetails.clothes} trajes</span>
-                            <span className="rounded-md bg-pink-500/15 px-2 py-1">🚗 {customPlanDetails.cars} carros</span>
-                          </div>
-                        )}
                       </div>
-                      <span className="rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-xs text-cyan-200">
-                        {money.format(product.price)}
-                      </span>
-                    </div>
-                    <div className="mt-4 flex flex-wrap gap-2 text-xs text-slate-300">
-                      <span className="rounded-full bg-white/5 px-3 py-1">Estoque: {product.stock}</span>
-                      <span className="rounded-full bg-white/5 px-3 py-1">Entrega: {product.deliveryType}</span>
-                      {normalizeTags(product.tags).map((tag) => (
-                        <span key={tag} className="rounded-full bg-white/5 px-3 py-1">
-                          #{tag}
-                        </span>
-                      ))}
-                    </div>
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setPreviewProduct(product)}
-                        disabled={Boolean(actionState)}
-                        className="cursor-pointer inline-flex items-center gap-2 rounded-2xl border border-emerald-400/20 bg-emerald-400/10 px-3 py-2 text-sm font-medium text-emerald-100 transition hover:bg-emerald-400/20 disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        <FiEye className="h-4 w-4" aria-hidden="true" />
-                        Ver preview
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => editProduct(product)}
-                        disabled={Boolean(actionState)}
-                        className="cursor-pointer inline-flex items-center gap-2 rounded-2xl border border-cyan-400/20 bg-cyan-400/10 px-3 py-2 text-sm font-medium text-cyan-100 transition hover:bg-cyan-400/20 disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        <FiEdit2 className="h-4 w-4" aria-hidden="true" />
-                        Editar
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => deleteProduct(product)}
-                        disabled={Boolean(actionState)}
-                        className="cursor-pointer inline-flex items-center gap-2 rounded-2xl border border-rose-400/20 bg-rose-400/10 px-3 py-2 text-sm font-medium text-rose-100 transition hover:bg-rose-400/20 disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        <FiX className="h-4 w-4" aria-hidden="true" />
-                        {actionState === `product:${product.id}:delete` ? "Excluindo..." : "Excluir"}
-                      </button>
-                    </div>
-                  </article>
-                )})
-              )}
+                    )}
+
+                    {nonCustomProducts.length > 0 && nonCustomProducts.map((product) => {
+                      const isEditingProduct = editingProductId === product.id;
+                      const isCustomPlan = normalizeTags(product.tags).includes("custom:plan");
+
+                      // Extract custom plan details from tags
+                      let customPlanDetails = { money: 0, clothes: 0, cars: 0 };
+                      if (isCustomPlan) {
+                        normalizeTags(product.tags).forEach((tag) => {
+                          if (tag.startsWith("money:")) customPlanDetails.money = parseInt((tag.split(":")[1] || "0"), 10);
+                          if (tag.startsWith("clothes:")) customPlanDetails.clothes = parseInt((tag.split(":")[1] || "0"), 10);
+                          if (tag.startsWith("cars:")) customPlanDetails.cars = parseInt((tag.split(":")[1] || "0"), 10);
+                        });
+                      }
+
+                      return (
+                        <article
+                          key={product.id}
+                          className={`rounded-2xl border ${
+                            isCustomPlan ? "border-violet-500/30 bg-violet-500/5" : "border-white/10 bg-slate-950/70"
+                          } p-4 ${isEditingProduct ? "opacity-60 grayscale pointer-events-none" : ""}`}
+                        >
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <h3 className="text-lg font-semibold text-white">{product.title}</h3>
+                                {isCustomPlan && (
+                                  <span className="rounded-full border border-violet-400/30 bg-violet-400/10 px-2 py-1 text-xs font-medium text-violet-300">
+                                    ⚙️ Personalizado
+                                  </span>
+                                )}
+                              </div>
+                              <p className="mt-2 text-sm leading-6 text-slate-400">{product.description}</p>
+                              {isCustomPlan && (
+                                <div className="mt-3 flex gap-3 text-xs text-slate-300">
+                                  <span className="rounded-md bg-emerald-500/15 px-2 py-1">💰 {customPlanDetails.money}M</span>
+                                  <span className="rounded-md bg-cyan-500/15 px-2 py-1">👕 {customPlanDetails.clothes} trajes</span>
+                                  <span className="rounded-md bg-pink-500/15 px-2 py-1">🚗 {customPlanDetails.cars} carros</span>
+                                </div>
+                              )}
+                            </div>
+                            <span className="rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-xs text-cyan-200">
+                              {money.format(product.price)}
+                            </span>
+                          </div>
+                          <div className="mt-4 flex flex-wrap gap-2 text-xs text-slate-300">
+                            <span className="rounded-full bg-white/5 px-3 py-1">Estoque: {product.stock}</span>
+                            <span className="rounded-full bg-white/5 px-3 py-1">Entrega: {product.deliveryType}</span>
+                            {normalizeTags(product.tags).map((tag) => (
+                              <span key={tag} className="rounded-full bg-white/5 px-3 py-1">#{tag}</span>
+                            ))}
+                          </div>
+                          <div className="mt-4 flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setPreviewProduct(product)}
+                              disabled={Boolean(actionState)}
+                              className="cursor-pointer inline-flex items-center gap-2 rounded-2xl border border-emerald-400/20 bg-emerald-400/10 px-3 py-2 text-sm font-medium text-emerald-100 transition hover:bg-emerald-400/20 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              <FiEye className="h-4 w-4" aria-hidden="true" />
+                              Ver preview
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => editProduct(product)}
+                              disabled={Boolean(actionState)}
+                              className="cursor-pointer inline-flex items-center gap-2 rounded-2xl border border-cyan-400/20 bg-cyan-400/10 px-3 py-2 text-sm font-medium text-cyan-100 transition hover:bg-cyan-400/20 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              <FiEdit2 className="h-4 w-4" aria-hidden="true" />
+                              Editar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => deleteProduct(product)}
+                              disabled={Boolean(actionState)}
+                              className="cursor-pointer inline-flex items-center gap-2 rounded-2xl border border-rose-400/20 bg-rose-400/10 px-3 py-2 text-sm font-medium text-rose-100 transition hover:bg-rose-400/20 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              <FiX className="h-4 w-4" aria-hidden="true" />
+                              {actionState === `product:${product.id}:delete` ? "Excluindo..." : "Excluir"}
+                            </button>
+                          </div>
+                        </article>
+                      );
+                    })}
+                  </>
+                );
+              })()}
             </div>
           </section>
         ) : null}
