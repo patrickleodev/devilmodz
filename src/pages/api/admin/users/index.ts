@@ -18,30 +18,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const dataSource = await ensureDataSource();
-  const orders = await dataSource.query(`
+  const users = await dataSource.query(`
     SELECT
-      o."id",
-      o."status",
-      o."amount"::float AS "amount",
-      o."createdAt",
-      o."discordThreadId",
-      o."discordThreadUrl",
-      json_build_object(
-        'id', u."id",
-        'email', u."email",
-        'name', u."name",
-        'discordId', u."discordId"
-      ) AS "user",
-      json_build_object(
-        'id', p."id",
-        'title', p."title",
-        'deliveryType', p."deliveryType"
-      ) AS "product"
-    FROM "orders" o
-    LEFT JOIN "users" u ON u."id" = o."userId"
-    LEFT JOIN "products" p ON p."id" = o."productId"
-    ORDER BY o."createdAt" DESC
+      u."id",
+      u."name",
+      u."email",
+      u."discordId",
+      u."roles",
+      u."createdAt",
+      COUNT(o."id")::int AS "ordersCount",
+      COALESCE(SUM(o."amount"), 0)::float AS "totalSpent",
+      MAX(o."createdAt") AS "lastOrderAt"
+    FROM "users" u
+    LEFT JOIN "orders" o ON o."userId" = u."id"
+    GROUP BY u."id"
+    ORDER BY COALESCE(MAX(o."createdAt"), u."createdAt") DESC
   `);
 
-  return res.status(200).json({ orders });
+  return res.status(200).json({ users });
 }

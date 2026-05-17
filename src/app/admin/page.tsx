@@ -17,7 +17,7 @@ export default function AdminPage() {
     }
 
     if (!session || !isAdminRole(sessionUser?.roles)) {
-      router.replace("/");
+      router.replace("/auth/signin?callbackUrl=/admin");
     }
   }, [router, session, sessionUser?.roles, status]);
 

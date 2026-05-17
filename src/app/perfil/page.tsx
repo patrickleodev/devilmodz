@@ -170,17 +170,6 @@ export default function AccountPage() {
     }
   };
 
-  const closeTicket = async (orderId: string) => {
-    try {
-      const res = await fetch(`/api/orders/${orderId}/ticket/close`, { method: "POST" });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.error || "Falha ao fechar ticket");
-      setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, discordThreadUrl: undefined } : o)));
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "Erro ao fechar ticket");
-    }
-  };
-
   if (status === "loading") {
     return (
       <main className="mx-auto flex min-h-[70vh] max-w-4xl items-center justify-center px-4 py-10 sm:px-6 lg:px-10">
@@ -443,14 +432,6 @@ export default function AccountPage() {
                                         Ticket automático em processamento
                                       </span>
                                     </>
-                                  ) : null}
-                                  {order.discordThreadUrl ? (
-                                    <button
-                                      onClick={() => closeTicket(order.id)}
-                                      className="ml-2 inline-flex items-center justify-center rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-2.5 text-sm font-semibold text-rose-100 transition hover:bg-rose-500/20"
-                                    >
-                                      Fechar ticket
-                                    </button>
                                   ) : null}
                                 </div>
                               </article>

@@ -4,11 +4,14 @@ import { useSession, signIn, signOut } from "next-auth/react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
+import { isAdminRole } from "../lib/admin";
 
 const CartSidebar = dynamic(() => import("../components/CartSidebar"), { ssr: false });
 
 export default function Header() {
   const { data: session } = useSession();
+  const sessionUser = session?.user as { roles?: string[] } | undefined;
+  const isAdmin = isAdminRole(sessionUser?.roles);
   const [menuOpen, setMenuOpen] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
   const [cartNotify, setCartNotify] = useState(false);
@@ -189,6 +192,19 @@ export default function Header() {
                         </span>
                         Gerenciar perfil
                       </Link>
+
+                      {isAdmin ? (
+                        <Link
+                          href="/admin"
+                          onClick={() => setProfileMenuOpen(false)}
+                          className="flex items-center gap-2.5 rounded-2xl px-3 py-2 text-sm font-medium text-slate-200 transition hover:bg-white/5 hover:text-white"
+                        >
+                          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-400/10 text-emerald-200">
+                            A
+                          </span>
+                          Painel admin
+                        </Link>
+                      ) : null}
 
                       <button
                         type="button"

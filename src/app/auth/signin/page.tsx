@@ -27,7 +27,7 @@ export default function SignInPage({ searchParams }: SignInPageProps) {
     <main className="flex min-h-[calc(100vh-4rem)] items-center justify-center px-4 py-10">
       <section className="w-full max-w-md rounded-[32px] border border-white/10 bg-slate-950/90 p-8 text-center shadow-2xl shadow-black/30">
         <p className="text-xs uppercase tracking-[0.32em] text-cyan-200/70">DEVIL MODZ</p>
-        <h1 className="mt-3 text-3xl font-semibold text-white">Entrar com Discord</h1>
+        <h1 className="mt-3 text-3xl font-semibold text-white">Entrar na conta</h1>
         <p className="mt-4 text-sm leading-6 text-slate-300">{message}</p>
 
         <SignInClient callbackUrl={callbackUrl} />
