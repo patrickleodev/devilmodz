@@ -35,7 +35,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       json_build_object(
         'id', p."id",
         'title', p."title",
-        'deliveryType', p."deliveryType"
+        'deliveryType', p."deliveryType",
+        'tags', p."tags"
       ) AS "product"
     FROM "orders" o
     LEFT JOIN "users" u ON u."id" = o."userId"

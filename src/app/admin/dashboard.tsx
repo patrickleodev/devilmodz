@@ -22,7 +22,7 @@ type AdminOrder = {
   createdAt: string;
   discordThreadUrl?: string | null;
   user?: { id?: string | null; email?: string | null; name?: string | null; discordId?: string | null };
-  product?: { title?: string | null; id?: string | null; deliveryType?: string | null };
+  product?: { title?: string | null; id?: string | null; deliveryType?: string | null; tags?: string[] | null };
 };
 
 type AdminUser = {
@@ -362,13 +362,37 @@ export default function AdminDashboard() {
               <p className="text-sm text-slate-400">Nenhum pedido encontrado.</p>
             ) : (
               orders.map((order) => (
-                <article key={order.id} className="rounded-2xl border border-white/10 bg-slate-950/70 p-5">
+                <article key={order.id} className={`rounded-2xl border ${order.product?.tags?.includes("custom:plan") ? "border-violet-500/30 bg-violet-500/5" : "border-white/10 bg-slate-950/70"} p-5`}>
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                     <div className="min-w-0">
                       <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Pedido {order.id.slice(0, 8)}</p>
-                      <h2 className="mt-2 text-xl font-semibold text-white">
-                        {order.product?.title || order.product?.id || "Produto removido"}
-                      </h2>
+                      <div className="flex items-center gap-2 mt-2">
+                        <h2 className="text-xl font-semibold text-white">
+                          {order.product?.title || order.product?.id || "Produto removido"}
+                        </h2>
+                        {order.product?.tags?.includes("custom:plan") && (
+                          <span className="rounded-full border border-violet-400/30 bg-violet-400/10 px-2 py-1 text-xs font-medium text-violet-300">
+                            ⚙️ Personalizado
+                          </span>
+                        )}
+                      </div>
+                      {order.product?.tags?.includes("custom:plan") && (
+                        <div className="mt-3 flex gap-3 text-xs text-slate-300">
+                          {(() => {
+                            const tags = order.product?.tags || [];
+                            const money = tags.find(t => t.startsWith("money:"))?.split(":")[1] || "0";
+                            const clothes = tags.find(t => t.startsWith("clothes:"))?.split(":")[1] || "0";
+                            const cars = tags.find(t => t.startsWith("cars:"))?.split(":")[1] || "0";
+                            return (
+                              <>
+                                <span className="rounded-md bg-emerald-500/15 px-2 py-1">💰 {money}M</span>
+                                <span className="rounded-md bg-cyan-500/15 px-2 py-1">👕 {clothes} trajes</span>
+                                <span className="rounded-md bg-pink-500/15 px-2 py-1">🚗 {cars} carros</span>
+                              </>
+                            );
+                          })()}
+                        </div>
+                      )}
                       <p className="mt-2 text-sm text-slate-400">
                         {order.user?.email || order.user?.name || "Cliente sem identificacao"}
                       </p>
@@ -654,10 +678,10 @@ export default function AdminDashboard() {
             <div className="grid gap-4 self-start">
               {loading ? (
                 <p className="text-sm text-slate-400">Carregando produtos...</p>
-              ) : products.length === 0 ? (
+              ) : products.filter(p => !(p.tags || []).includes("custom:plan")).length === 0 ? (
                 <p className="text-sm text-slate-400">Nenhum produto encontrado.</p>
               ) : (
-                products.map((product) => {
+                products.filter(p => !(p.tags || []).includes("custom:plan")).map((product) => {
                   const isEditingProduct = editingProductId === product.id;
                   const isCustomPlan = (product.tags || []).includes("custom:plan");
                   
