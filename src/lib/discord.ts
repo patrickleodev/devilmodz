@@ -51,6 +51,12 @@ type DiscordChannelMessage = {
   channel_id: string;
 };
 
+type DiscordTicketTarget = {
+  messageId: string | null;
+  threadId: string;
+  threadUrl: string | null;
+};
+
 const postDiscordChannelMessage = async (content: string, channelId = getNotificationChannelId()) => {
   if (!channelId) {
     return null;
@@ -173,12 +179,26 @@ export const createOrderTicketThread = async (input: {
       console.warn("[Discord] Nenhum discordId encontrado para o cliente; ticket será criado sem acesso direto do cliente.");
     }
 
+    const ticketName = `pedido-${input.orderId.slice(0, 8)}`;
+    const existingTicket = await findExistingTicketByName({
+      channelId,
+      channelType: channel.type,
+      guildId: getGuildId(),
+      ticketName,
+      clientId,
+    });
+
+    if (existingTicket) {
+      console.log("[Discord] Ticket existente encontrado; reutilizando:", existingTicket.threadId);
+      return existingTicket;
+    }
+
     // Forum channel (type 15)
     if (channel.type === ChannelType.GuildForum) {
       console.log("[Discord] Criando thread privada no forum...");
       const thread = (await createRestClient().post(Routes.threads(channelId), {
         body: {
-          name: `pedido-${input.orderId.slice(0, 8)}`,
+          name: ticketName,
           auto_archive_duration: 1440,
           message: {
             content: messageContent,
@@ -280,7 +300,7 @@ export const createOrderTicketThread = async (input: {
       let ticketChannel: { id?: string } | null = null;
       try {
         const payload = {
-          name: `pedido-${input.orderId.slice(0, 8)}`,
+          name: ticketName,
           type: ChannelType.GuildText,
           permission_overwrites: permissionOverwrites,
           topic: `Ticket privado do pedido ${input.orderId}`,
@@ -348,6 +368,104 @@ export const createOrderTicketThread = async (input: {
     
     return null;
   }
+};
+
+const findExistingTicketByName = async (input: {
+  channelId: string;
+  channelType?: number;
+  guildId?: string;
+  ticketName: string;
+  clientId?: string | null;
+}): Promise<DiscordTicketTarget | null> => {
+  try {
+    if (input.channelType === ChannelType.GuildForum) {
+      const thread = await findForumThreadByName({
+        channelId: input.channelId,
+        guildId: input.guildId,
+        ticketName: input.ticketName,
+      });
+
+      if (!thread?.id) {
+        return null;
+      }
+
+      if (input.clientId) {
+        await addThreadMember(thread.id, input.clientId);
+      }
+
+      return {
+        messageId: null,
+        threadId: thread.id,
+        threadUrl: input.guildId ? `https://discord.com/channels/${input.guildId}/${thread.id}` : null,
+      };
+    }
+
+    if (input.channelType === ChannelType.GuildText && input.guildId) {
+      const channels = (await createRestClient().get(`/guilds/${input.guildId}/channels`)) as Array<{
+        id?: string;
+        name?: string;
+        type?: number;
+      }>;
+
+      const channel = channels.find((candidate) => {
+        return candidate.type === ChannelType.GuildText && isSameDiscordName(candidate.name, input.ticketName);
+      });
+
+      if (!channel?.id) {
+        return null;
+      }
+
+      return {
+        messageId: null,
+        threadId: channel.id,
+        threadUrl: `https://discord.com/channels/${input.guildId}/${channel.id}`,
+      };
+    }
+  } catch (err) {
+    console.warn("[Discord] Falha ao buscar ticket existente:", err instanceof Error ? err.message : err);
+  }
+
+  return null;
+};
+
+const findForumThreadByName = async (input: {
+  channelId: string;
+  guildId?: string;
+  ticketName: string;
+}): Promise<{ id?: string; name?: string } | null> => {
+  const endpoints: Array<{ url: `/${string}`; filterByParent: boolean }> = [
+    ...(input.guildId ? [{ url: `/guilds/${input.guildId}/threads/active` as `/${string}`, filterByParent: true }] : []),
+    { url: `/channels/${input.channelId}/threads/archived/public?limit=100`, filterByParent: false },
+    { url: `/channels/${input.channelId}/threads/archived/private?limit=100`, filterByParent: false },
+  ];
+
+  for (const endpoint of endpoints) {
+    try {
+      const response = (await createRestClient().get(endpoint.url)) as {
+        threads?: Array<{ id?: string; name?: string; parent_id?: string }>;
+      };
+      const thread = response.threads?.find((candidate) => {
+        const isSameParent = !endpoint.filterByParent || candidate.parent_id === input.channelId;
+        return isSameParent && isSameDiscordName(candidate.name, input.ticketName);
+      });
+
+      if (thread?.id) {
+        return thread;
+      }
+    } catch (err) {
+      console.warn("[Discord] Falha ao consultar threads do forum:", endpoint.url, err instanceof Error ? err.message : err);
+    }
+  }
+
+  return null;
+};
+
+const normalizeDiscordName = (name?: string | null) => {
+  return (name || "").trim().toLowerCase();
+};
+
+const isSameDiscordName = (actualName: string | undefined, expectedName: string) => {
+  return normalizeDiscordName(actualName) === normalizeDiscordName(expectedName);
 };
 
 const extractClientIdFromMention = (clientMentionStr?: string | null): string | null => {
