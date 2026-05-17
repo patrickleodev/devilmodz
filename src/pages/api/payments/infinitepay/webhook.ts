@@ -234,6 +234,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const paymentRepository = dataSource.getRepository(Payment);
     const productRepository = dataSource.getRepository(Product);
     const userRepository = dataSource.getRepository(User);
+    let transaction = req.body as any;
 
     // If we have checkoutId, find payment by it
     let payment = checkoutId
@@ -257,8 +258,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (!payment) {
       // Prefer to fetch the authoritative transaction from InfinitePay when we have an ID
-      let transaction = req.body as any;
-
       if (transactionId) {
         try {
           const fetched = await fetchInfinitePayTransaction(transactionId);
