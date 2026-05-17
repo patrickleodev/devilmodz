@@ -49,8 +49,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   if (req.method === "DELETE") {
-    await productRepository.remove(product);
-    return res.status(204).end();
+    try {
+      await productRepository.remove(product);
+      return res.status(204).end();
+    } catch {
+      return res.status(409).json({ error: "Nao foi possivel excluir este produto. Verifique se ele ja possui pedidos." });
+    }
   }
 
   res.setHeader("Allow", ["PATCH", "DELETE"]);

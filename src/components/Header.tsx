@@ -77,7 +77,7 @@ export default function Header() {
 
   return (
     <>
-      <header className="w-full border-b border-white/10 bg-slate-950/95 sticky top-0 z-50">
+      <header className="fixed left-0 right-0 top-0 z-50 w-full border-b border-white/10 bg-slate-950/95">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-2 sm:px-6 lg:px-10">
           {/* Logo */}
           <Link

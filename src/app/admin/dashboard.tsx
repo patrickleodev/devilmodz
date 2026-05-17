@@ -51,6 +51,7 @@ export default function AdminDashboard() {
   const [orders, setOrders] = useState<AdminOrder[]>([]);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [productForm, setProductForm] = useState(emptyProductForm);
+  const [editingProductId, setEditingProductId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionState, setActionState] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -110,38 +111,90 @@ export default function AdminDashboard() {
     return () => window.clearTimeout(timeoutId);
   }, []);
 
-  const createProduct = async () => {
-    setActionState("create-product");
+  const resetProductForm = () => {
+    setProductForm(emptyProductForm);
+    setEditingProductId(null);
+  };
+
+  const buildProductPayload = () => ({
+    title: productForm.title,
+    description: productForm.description,
+    price: Number(productForm.price.replace(",", ".")),
+    stock: Number(productForm.stock || 0),
+    deliveryType: productForm.deliveryType,
+    tags: productForm.tags
+      .split(",")
+      .map((tag) => tag.trim())
+      .filter(Boolean),
+  });
+
+  const saveProduct = async () => {
+    const isEditing = Boolean(editingProductId);
+    setActionState(isEditing ? `product:${editingProductId}:save` : "create-product");
     setMessage(null);
 
     try {
-      const response = await fetch("/api/admin/products", {
-        method: "POST",
+      const response = await fetch(editingProductId ? `/api/admin/products/${editingProductId}` : "/api/admin/products", {
+        method: editingProductId ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: productForm.title,
-          description: productForm.description,
-          price: Number(productForm.price.replace(",", ".")),
-          stock: Number(productForm.stock || 0),
-          deliveryType: productForm.deliveryType,
-          tags: productForm.tags
-            .split(",")
-            .map((tag) => tag.trim())
-            .filter(Boolean),
-        }),
+        body: JSON.stringify(buildProductPayload()),
       });
 
       const payload = (await response.json()) as { error?: string };
 
       if (!response.ok) {
-        throw new Error(payload.error || "Falha ao criar produto");
+        throw new Error(payload.error || (isEditing ? "Falha ao atualizar produto" : "Falha ao criar produto"));
       }
 
-      setProductForm(emptyProductForm);
+      resetProductForm();
       await loadData();
-      setMessage("Produto criado com sucesso.");
+      setMessage(isEditing ? "Produto atualizado com sucesso." : "Produto criado com sucesso.");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Erro inesperado ao criar produto");
+      setMessage(error instanceof Error ? error.message : "Erro inesperado ao salvar produto");
+    } finally {
+      setActionState(null);
+    }
+  };
+
+  const editProduct = (product: AdminProduct) => {
+    setProductForm({
+      title: product.title || "",
+      description: product.description || "",
+      price: String(product.price ?? ""),
+      stock: String(product.stock ?? ""),
+      deliveryType: product.deliveryType || "manual",
+      tags: (product.tags || []).join(", "),
+    });
+    setEditingProductId(product.id);
+    setMessage(null);
+  };
+
+  const deleteProduct = async (product: AdminProduct) => {
+    const confirmed = window.confirm(`Excluir o produto "${product.title}"? Essa acao nao pode ser desfeita.`);
+
+    if (!confirmed) {
+      return;
+    }
+
+    setActionState(`product:${product.id}:delete`);
+    setMessage(null);
+
+    try {
+      const response = await fetch(`/api/admin/products/${product.id}`, { method: "DELETE" });
+
+      if (!response.ok) {
+        const payload = (await response.json()) as { error?: string };
+        throw new Error(payload.error || "Falha ao excluir produto");
+      }
+
+      if (editingProductId === product.id) {
+        resetProductForm();
+      }
+
+      await loadData();
+      setMessage("Produto excluido com sucesso.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Erro inesperado ao excluir produto");
     } finally {
       setActionState(null);
     }
@@ -354,60 +407,96 @@ export default function AdminDashboard() {
           <section className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
             <div className="rounded-2xl border border-white/10 bg-slate-950/70 p-5">
               <p className="text-xs uppercase tracking-[0.28em] text-slate-500">Catalogo</p>
-              <h2 className="mt-2 text-2xl font-semibold">Criar produto</h2>
+              <h2 className="mt-2 text-2xl font-semibold">{editingProductId ? "Editar produto" : "Criar produto"}</h2>
 
               <div className="mt-5 grid gap-3">
-                <input
-                  value={productForm.title}
-                  onChange={(event) => setProductForm((current) => ({ ...current, title: event.target.value }))}
-                  placeholder="Nome do plano. Ex: Pacote Pro"
-                  className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm outline-none placeholder:text-slate-500"
-                />
-                <input
-                  value={productForm.price}
-                  onChange={(event) => setProductForm((current) => ({ ...current, price: event.target.value }))}
-                  inputMode="decimal"
-                  placeholder="Preco em reais. Ex: 49.90"
-                  className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm outline-none placeholder:text-slate-500"
-                />
-                <textarea
-                  value={productForm.description}
-                  onChange={(event) => setProductForm((current) => ({ ...current, description: event.target.value }))}
-                  placeholder="Descreva o que o cliente recebe, prazo e atendimento incluso."
-                  className="min-h-[110px] rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm outline-none placeholder:text-slate-500"
-                />
-                <div className="grid gap-3 sm:grid-cols-2">
+                <label className="grid gap-2 text-sm font-medium text-slate-200">
+                  Nome
                   <input
-                    value={productForm.stock}
-                    onChange={(event) => setProductForm((current) => ({ ...current, stock: event.target.value }))}
-                    inputMode="numeric"
-                    placeholder="Quantidade disponivel. Ex: 999"
-                    className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm outline-none placeholder:text-slate-500"
+                    value={productForm.title}
+                    onChange={(event) => setProductForm((current) => ({ ...current, title: event.target.value }))}
+                    placeholder="Nome do plano. Ex: Pacote Pro"
+                    className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-normal outline-none placeholder:text-slate-500"
                   />
-                  <select
-                    value={productForm.deliveryType}
-                    onChange={(event) => setProductForm((current) => ({ ...current, deliveryType: event.target.value }))}
-                    className="rounded-2xl border border-white/10 bg-slate-900 px-4 py-3 text-sm outline-none"
-                  >
-                    <option value="manual">Manual</option>
-                    <option value="automatic">Automatico</option>
-                  </select>
+                </label>
+                <label className="grid gap-2 text-sm font-medium text-slate-200">
+                  Preco
+                  <input
+                    value={productForm.price}
+                    onChange={(event) => setProductForm((current) => ({ ...current, price: event.target.value }))}
+                    inputMode="decimal"
+                    placeholder="Preco em reais. Ex: 49.90"
+                    className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-normal outline-none placeholder:text-slate-500"
+                  />
+                </label>
+                <label className="grid gap-2 text-sm font-medium text-slate-200">
+                  Descricao
+                  <textarea
+                    value={productForm.description}
+                    onChange={(event) => setProductForm((current) => ({ ...current, description: event.target.value }))}
+                    placeholder="Descreva o que o cliente recebe, prazo e atendimento incluso."
+                    className="min-h-[110px] rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-normal outline-none placeholder:text-slate-500"
+                  />
+                </label>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="grid gap-2 text-sm font-medium text-slate-200">
+                    Estoque
+                    <input
+                      value={productForm.stock}
+                      onChange={(event) => setProductForm((current) => ({ ...current, stock: event.target.value }))}
+                      inputMode="numeric"
+                      placeholder="Quantidade disponivel. Ex: 999"
+                      className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-normal outline-none placeholder:text-slate-500"
+                    />
+                  </label>
+                  <label className="grid gap-2 text-sm font-medium text-slate-200">
+                    Tipo de entrega
+                    <select
+                      value={productForm.deliveryType}
+                      onChange={(event) => setProductForm((current) => ({ ...current, deliveryType: event.target.value }))}
+                      className="rounded-2xl border border-white/10 bg-slate-900 px-4 py-3 text-sm font-normal outline-none"
+                    >
+                      <option value="manual">Manual</option>
+                      <option value="automatic">Automatico</option>
+                    </select>
+                  </label>
                 </div>
-                <input
-                  value={productForm.tags}
-                  onChange={(event) => setProductForm((current) => ({ ...current, tags: event.target.value }))}
-                  placeholder="Tags separadas por virgula. Ex: public, plan:vip, badge:Mais vendido"
-                  className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm outline-none placeholder:text-slate-500"
-                />
+                <label className="grid gap-2 text-sm font-medium text-slate-200">
+                  Tags
+                  <input
+                    value={productForm.tags}
+                    onChange={(event) => setProductForm((current) => ({ ...current, tags: event.target.value }))}
+                    placeholder="Tags separadas por virgula. Ex: public, plan:vip, badge:Mais vendido"
+                    className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-normal outline-none placeholder:text-slate-500"
+                  />
+                </label>
               </div>
 
-              <button
-                onClick={createProduct}
-                disabled={actionState === "create-product"}
-                className="mt-5 inline-flex w-full justify-center rounded-2xl bg-gradient-to-r from-cyan-400 to-emerald-400 px-5 py-3 font-semibold text-slate-950 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {actionState === "create-product" ? "Criando..." : "Salvar produto"}
-              </button>
+              <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+                <button
+                  onClick={saveProduct}
+                  disabled={Boolean(actionState)}
+                  className="inline-flex flex-1 justify-center rounded-2xl bg-gradient-to-r from-cyan-400 to-emerald-400 px-5 py-3 font-semibold text-slate-950 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {actionState?.includes(":save")
+                    ? "Salvando..."
+                    : actionState === "create-product"
+                      ? "Criando..."
+                      : editingProductId
+                        ? "Salvar alteracoes"
+                        : "Salvar produto"}
+                </button>
+                {editingProductId ? (
+                  <button
+                    type="button"
+                    onClick={resetProductForm}
+                    disabled={Boolean(actionState)}
+                    className="rounded-2xl border border-white/10 bg-white/5 px-5 py-3 font-semibold text-slate-200 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    Cancelar
+                  </button>
+                ) : null}
+              </div>
             </div>
 
             <div className="grid gap-4">
@@ -435,6 +524,24 @@ export default function AdminDashboard() {
                           #{tag}
                         </span>
                       ))}
+                    </div>
+                    <div className="mt-5 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => editProduct(product)}
+                        disabled={Boolean(actionState)}
+                        className="rounded-2xl border border-cyan-400/20 bg-cyan-400/10 px-4 py-2 text-sm font-medium text-cyan-100 transition hover:bg-cyan-400/20 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        Editar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => deleteProduct(product)}
+                        disabled={Boolean(actionState)}
+                        className="rounded-2xl border border-rose-400/20 bg-rose-400/10 px-4 py-2 text-sm font-medium text-rose-100 transition hover:bg-rose-400/20 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {actionState === `product:${product.id}:delete` ? "Excluindo..." : "Excluir"}
+                      </button>
                     </div>
                   </article>
                 ))

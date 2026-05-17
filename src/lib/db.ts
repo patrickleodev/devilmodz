@@ -45,7 +45,7 @@ export const seedDefaultProducts = async (options: { force?: boolean } = {}) => 
   }
 };
 
-export const ensureDataSource = async () => {
+export const ensureDataSource = async (options: { seedProducts?: boolean } = {}) => {
   if (!AppDataSource.isInitialized) {
     await AppDataSource.initialize();
   }
@@ -88,7 +88,9 @@ export const ensureDataSource = async () => {
     );
   }
 
-  await seedDefaultProducts();
+  if (options.seedProducts) {
+    await seedDefaultProducts();
+  }
 
   return AppDataSource;
 };

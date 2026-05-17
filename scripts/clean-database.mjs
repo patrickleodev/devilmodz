@@ -57,13 +57,13 @@ const client = new pg.Client({
     console.log("");
     console.log("📊 Tabelas vazias:");
     console.log("  - users");
-    console.log("  - products (produtos padrão serão recriados ao iniciar)");
+    console.log("  - products (mantida)");
     console.log("  - orders");
     console.log("  - payments");
     console.log("  - delivery_logs");
     console.log("  - cart_items");
     console.log("");
-    console.log("⚠️  Próximo passo: Reinicie o servidor para recriar produtos padrão");
+    console.log("⚠️  Para recriar produtos padrão, rode: npm run db:seed");
 
     await client.end();
   } catch (error) {

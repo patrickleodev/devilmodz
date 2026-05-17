@@ -16,7 +16,7 @@ export default function Providers({ children }: ProvidersProps) {
 
   return (
     <SessionProvider>
-      <div className="flex min-h-screen flex-col">
+      <div className="flex min-h-screen flex-col pt-[81px]">
         <Header />
         <main
           className={`flex flex-1 flex-col ${
