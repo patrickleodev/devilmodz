@@ -1,13 +1,14 @@
 "use client";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 export default function PlanosPersonalizadosClient() {
+  const router = useRouter();
   const [milhoes, setMilhoes] = useState(0);
   const [trajes, setTrajes] = useState(0);
   const [carros, setCarros] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
-  const [usedFallback, setUsedFallback] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const steps = Math.max(0, milhoes / 30);
   const PRICE_PER_STEP = 14.9;
@@ -26,19 +27,26 @@ export default function PlanosPersonalizadosClient() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setCheckoutUrl(null);
-    setUsedFallback(false);
+    setError(null);
 
     try {
-      const res = await fetch("/api/payments/infinitepay/custom-checkout", {
+      const res = await fetch("/api/cart/personalized", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ milhoes, trajes }),
+        body: JSON.stringify({ milhoes, trajes, carros }),
       });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Erro ao adicionar ao carrinho");
+      }
+
       const data = await res.json();
-      if (data.fallback) setUsedFallback(true);
-      setCheckoutUrl(data.url);
-      if (data.url) window.location.href = data.url;
+      
+      // Redirect to cart
+      router.push("/cart");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro desconhecido");
     } finally {
       setLoading(false);
     }
@@ -199,15 +207,12 @@ export default function PlanosPersonalizadosClient() {
                 disabled={loading || valorTotal < 2}
                 className="inline-flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-cyan-400 to-emerald-400 px-5 py-3 font-semibold text-slate-950 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {loading ? "Abrindo checkout..." : "Gerar Checkout"}
+                {loading ? "Adicionando ao carrinho..." : "Adicionar ao Carrinho"}
               </button>
-              {usedFallback && (
-                <div className="rounded-md border border-yellow-600/20 bg-yellow-600/10 p-3 text-sm text-yellow-300">
-                  Foi utilizado um checkout público como fallback. Você será redirecionado.
+              {error && (
+                <div className="rounded-md border border-red-600/20 bg-red-600/10 p-3 text-sm text-red-300">
+                  {error}
                 </div>
-              )}
-              {checkoutUrl && !usedFallback && (
-                <div className="text-sm text-slate-300">Redirecionando para o checkout...</div>
               )}
             </div>
           </form>
