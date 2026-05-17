@@ -1,9 +1,7 @@
 "use client";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 
 export default function PlanosPersonalizadosClient() {
-  const router = useRouter();
   const [milhoes, setMilhoes] = useState(0);
   const [trajes, setTrajes] = useState(0);
   const [carros, setCarros] = useState(0);
@@ -41,10 +39,13 @@ export default function PlanosPersonalizadosClient() {
         throw new Error(data.error || "Erro ao adicionar ao carrinho");
       }
 
-      const data = await res.json();
-      
-      // Redirect to cart
-      router.push("/cart");
+      await res.json();
+
+      try {
+        window.dispatchEvent(new Event("open_cart"));
+      } catch {
+        /* ignore */
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro desconhecido");
     } finally {
