@@ -49,9 +49,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const amount = unitPrice * it.quantity;
       total += amount;
 
-      const order = orderRepo.create({ userId: dbUser.id, productId: product.id, amount, status: "pending" });
-      const saved = await orderRepo.save(order);
-      createdOrders.push(saved.id);
+      // Use raw SQL insert to avoid TypeORM attempting to write columns that may not exist
+      const insertRes = await ds.query(
+        `INSERT INTO "orders" ("userId", "productId", "amount", "status") VALUES ($1, $2, $3, $4) RETURNING "id"`,
+        [dbUser.id, product.id, amount, "pending"]
+      );
+
+      const savedId = insertRes?.[0]?.id as string | undefined;
+      if (savedId) createdOrders.push(savedId);
 
       mpItems.push({ id: product.id, title: product.title, quantity: it.quantity, unit_price: unitPrice, currency_id: "BRL" });
     }
@@ -77,14 +82,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const checkoutRes = await createCheckoutLink(payload);
 
-    // attach provider id to first order if available
+    // attach provider id to first order if available (use raw UPDATE)
     const firstOrderId = createdOrders[0];
     if (firstOrderId) {
-      const first = await orderRepo.findOneBy({ id: firstOrderId });
-      if (first) {
-        first.mpPreferenceId = (checkoutRes as any).id || "";
-        await orderRepo.save(first);
-      }
+      await ds.query(
+        `UPDATE "orders" SET "mpPreferenceId" = $2 WHERE "id" = $1`,
+        [firstOrderId, (checkoutRes as any).id || ""]
+      );
     }
 
     await paymentRepo.save(paymentRepo.create({ orderId: firstOrderId || "", provider: "infinitepay", providerPaymentId: (checkoutRes as any).id || "", status: "pending", rawPayload: checkoutRes }));
