@@ -62,7 +62,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const productSlug = `custom-${Date.now()}-${Math.random().toString(36).substring(7)}`;
 
     const productQuery = await dataSource.query(
-      `INSERT INTO "product" ("title", "slug", "description", "price", "deliveryType", "tags", "stock", "createdAt", "updatedAt")
+      `INSERT INTO "products" ("title", "slug", "description", "price", "deliveryType", "tags", "stock", "createdAt", "updatedAt")
        VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
        RETURNING "id"`,
       [

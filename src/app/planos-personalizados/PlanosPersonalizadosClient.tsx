@@ -205,7 +205,7 @@ export default function PlanosPersonalizadosClient() {
               <button
                 type="submit"
                 disabled={loading || valorTotal < 2}
-                className="inline-flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-cyan-400 to-emerald-400 px-5 py-3 font-semibold text-slate-950 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-cyan-400 to-emerald-400 px-5 py-3 font-semibold text-slate-950 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {loading ? "Adicionando ao carrinho..." : "Adicionar ao Carrinho"}
               </button>
