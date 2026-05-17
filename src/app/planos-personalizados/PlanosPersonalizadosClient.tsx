@@ -42,7 +42,7 @@ export default function PlanosPersonalizadosClient() {
       await res.json();
 
       try {
-        window.dispatchEvent(new Event("open_cart"));
+        window.dispatchEvent(new Event("cart_notify"));
       } catch {
         /* ignore */
       }
