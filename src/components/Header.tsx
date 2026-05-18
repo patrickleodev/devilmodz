@@ -5,6 +5,14 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { isAdminRole } from "../lib/admin";
+import {
+  FiFileText,
+  FiHome,
+  FiLock,
+  FiLogOut,
+  FiSettings,
+  FiShoppingCart,
+} from "react-icons/fi";
 
 const CartSidebar = dynamic(() => import("../components/CartSidebar"), { ssr: false });
 
@@ -293,11 +301,20 @@ export default function Header() {
           <div className="border-t border-white/10 bg-slate-900 md:hidden">
             <div className="flex flex-col gap-3 px-4 py-4">
               <Link
+                href="/"
+                className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-slate-300 hover:text-white hover:bg-white/5 transition"
+                onClick={() => setMenuOpen(false)}
+              >
+                <FiHome className="h-4 w-4" aria-hidden="true" />
+                <span>Início</span>
+              </Link>
+
+              <Link
                 href="/planos"
                 className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-slate-300 hover:text-white hover:bg-white/5 transition"
                 onClick={() => setMenuOpen(false)}
               >
-                <span className="text-base">📋</span>
+                <FiFileText className="h-4 w-4" aria-hidden="true" />
                 <span>Planos</span>
               </Link>
 
@@ -306,7 +323,7 @@ export default function Header() {
                 className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-slate-300 hover:text-white hover:bg-white/5 transition"
                 onClick={() => setMenuOpen(false)}
               >
-                <span className="text-base">🔒</span>
+                <FiLock className="h-4 w-4" aria-hidden="true" />
                 <span>Contas</span>
               </Link>
 
@@ -315,7 +332,7 @@ export default function Header() {
                 className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-slate-300 hover:text-white hover:bg-white/5 transition"
                 onClick={() => setMenuOpen(false)}
               >
-                <span className="text-base">📜</span>
+                <FiFileText className="h-4 w-4" aria-hidden="true" />
                 <span>Termos</span>
               </Link>
 
@@ -328,7 +345,7 @@ export default function Header() {
                 className="relative flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-slate-300 hover:text-white hover:bg-white/5 transition"
               >
                 <span className="relative inline-flex">
-                  🛒
+                  <FiShoppingCart className="h-4 w-4" aria-hidden="true" />
                   <span className={`absolute -right-2 -top-2 inline-flex min-w-[1.3rem] items-center justify-center rounded-full bg-emerald-400 px-1.5 text-[0.65rem] font-semibold text-slate-950 shadow-[0_0_0_4px_rgba(16,185,129,0.15)] ${cartNotify ? "animate-cart-notification" : ""}`}>
                     {cartCount}
                   </span>
@@ -351,7 +368,7 @@ export default function Header() {
                     onClick={() => setMenuOpen(false)}
                     className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-slate-300 hover:text-white hover:bg-white/5 transition"
                   >
-                    <span className="text-base">⚙</span>
+                    <FiSettings className="h-4 w-4" aria-hidden="true" />
                     <span>Gerenciar perfil</span>
                   </Link>
                   <button
@@ -359,8 +376,9 @@ export default function Header() {
                       signOut();
                       setMenuOpen(false);
                     }}
-                    className="w-full rounded-lg bg-red-500/10 px-3 py-2 text-sm font-medium text-red-200 hover:bg-red-500/20 transition"
+                    className="flex w-full items-center gap-2 rounded-lg bg-red-500/10 px-3 py-2 text-sm font-medium text-red-200 hover:bg-red-500/20 transition"
                   >
+                    <FiLogOut className="h-4 w-4" aria-hidden="true" />
                     Sair
                   </button>
                 </>

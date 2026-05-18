@@ -112,9 +112,6 @@ export default function Home() {
                     </div>
                     <div className="shrink-0 text-right">
                       <p className="text-lg font-semibold text-white">{money.format(plan.price)}</p>
-                      <Link href="/planos" className="mt-2 inline-block text-sm text-cyan-300">
-                        Ver opcoes
-                      </Link>
                     </div>
                   </div>
                 ))}
