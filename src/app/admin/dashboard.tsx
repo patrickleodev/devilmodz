@@ -423,9 +423,9 @@ export default function AdminDashboard() {
                             const cars = tagsArray.find((t) => t.startsWith("cars:"))?.split(":")[1] || "0";
                             return (
                               <>
-                                <span className="rounded-md bg-emerald-500/15 px-2 py-1">Dinheiro: {moneyVal}M</span>
-                                <span className="rounded-md bg-cyan-500/15 px-2 py-1">Trajes: {clothes}</span>
-                                <span className="rounded-md bg-pink-500/15 px-2 py-1">Carros: {cars}</span>
+                                <span className="rounded-md bg-emerald-500/15 px-2 py-1">💰 Dinheiro: {moneyVal}M</span>
+                                <span className="rounded-md bg-cyan-500/15 px-2 py-1">👕 Trajes: {clothes}</span>
+                                <span className="rounded-md bg-pink-500/15 px-2 py-1">🚗 Carros: {cars}</span>
                               </>
                             );
                           })()}
@@ -755,9 +755,9 @@ export default function AdminDashboard() {
                         <p className="mt-2 text-sm leading-6 text-slate-400">{product.description}</p>
                         {isCustomPlan && (
                           <div className="mt-3 flex gap-3 text-xs text-slate-300">
-                            <span className="rounded-md bg-emerald-500/15 px-2 py-1">Dinheiro: {customPlanDetails.money}M</span>
-                            <span className="rounded-md bg-cyan-500/15 px-2 py-1">Trajes: {customPlanDetails.clothes}</span>
-                            <span className="rounded-md bg-pink-500/15 px-2 py-1">Carros: {customPlanDetails.cars}</span>
+                            <span className="rounded-md bg-emerald-500/15 px-2 py-1">💰 Dinheiro: {customPlanDetails.money}M</span>
+                            <span className="rounded-md bg-cyan-500/15 px-2 py-1">👕 Trajes: {customPlanDetails.clothes}</span>
+                            <span className="rounded-md bg-pink-500/15 px-2 py-1">🚗 Carros: {customPlanDetails.cars}</span>
                           </div>
                         )}
                       </div>
