@@ -410,7 +410,7 @@ export default function AdminDashboard() {
                         </h2>
                         {normalizeTags(order.product?.tags).includes("custom:plan") && (
                           <span className="rounded-full border border-violet-400/30 bg-violet-400/10 px-2 py-1 text-xs font-medium text-violet-300">
-                            ÔÜÖ´©Å Personalizado
+                            Personalizado
                           </span>
                         )}
                       </div>
@@ -423,9 +423,9 @@ export default function AdminDashboard() {
                             const cars = tagsArray.find((t) => t.startsWith("cars:"))?.split(":")[1] || "0";
                             return (
                               <>
-                                <span className="rounded-md bg-emerald-500/15 px-2 py-1">­ƒÆ░ {moneyVal}M</span>
-                                <span className="rounded-md bg-cyan-500/15 px-2 py-1">­ƒæò {clothes} trajes</span>
-                                <span className="rounded-md bg-pink-500/15 px-2 py-1">­ƒÜù {cars} carros</span>
+                                <span className="rounded-md bg-emerald-500/15 px-2 py-1">Dinheiro: {moneyVal}M</span>
+                                <span className="rounded-md bg-cyan-500/15 px-2 py-1">Trajes: {clothes}</span>
+                                <span className="rounded-md bg-pink-500/15 px-2 py-1">Carros: {cars}</span>
                               </>
                             );
                           })()}
@@ -748,16 +748,16 @@ export default function AdminDashboard() {
                           <h3 className="text-lg font-semibold text-white">{product.title}</h3>
                           {isCustomPlan && (
                             <span className="rounded-full border border-violet-400/30 bg-violet-400/10 px-2 py-1 text-xs font-medium text-violet-300">
-                              ÔÜÖ´©Å Personalizado
+                              Personalizado
                             </span>
                           )}
                         </div>
                         <p className="mt-2 text-sm leading-6 text-slate-400">{product.description}</p>
                         {isCustomPlan && (
                           <div className="mt-3 flex gap-3 text-xs text-slate-300">
-                            <span className="rounded-md bg-emerald-500/15 px-2 py-1">­ƒÆ░ {customPlanDetails.money}M</span>
-                            <span className="rounded-md bg-cyan-500/15 px-2 py-1">­ƒæò {customPlanDetails.clothes} trajes</span>
-                            <span className="rounded-md bg-pink-500/15 px-2 py-1">­ƒÜù {customPlanDetails.cars} carros</span>
+                            <span className="rounded-md bg-emerald-500/15 px-2 py-1">Dinheiro: {customPlanDetails.money}M</span>
+                            <span className="rounded-md bg-cyan-500/15 px-2 py-1">Trajes: {customPlanDetails.clothes}</span>
+                            <span className="rounded-md bg-pink-500/15 px-2 py-1">Carros: {customPlanDetails.cars}</span>
                           </div>
                         )}
                       </div>
