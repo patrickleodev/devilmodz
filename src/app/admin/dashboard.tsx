@@ -358,25 +358,38 @@ export default function AdminDashboard() {
           ))}
         </section>
 
-        <div className="flex flex-wrap gap-2 border-b border-white/10 pb-3">
-          {[
-            ["orders", "Pedidos"],
-            ["clients", "Clientes"],
-            ["products", "Produtos"],
-          ].map(([view, label]) => (
-            <button
-              key={view}
-              type="button"
-              onClick={() => setActiveView(view as "orders" | "clients" | "products")}
-                  className={`cursor-pointer rounded-2xl px-4 py-2 text-sm font-semibold transition ${
-                activeView === view
-                  ? "bg-cyan-300 text-slate-950"
-                  : "border border-white/10 bg-white/5 text-slate-200 hover:bg-white/10"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-3">
+          <div className="flex flex-wrap gap-2">
+            {[
+              ["orders", "Pedidos"],
+              ["clients", "Clientes"],
+              ["products", "Produtos"],
+            ].map(([view, label]) => (
+              <button
+                key={view}
+                type="button"
+                onClick={() => setActiveView(view as "orders" | "clients" | "products")}
+                className={`cursor-pointer rounded-2xl px-4 py-2 text-sm font-semibold transition ${
+                  activeView === view
+                    ? "bg-cyan-300 text-slate-950"
+                    : "border border-white/10 bg-white/5 text-slate-200 hover:bg-white/10"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => void loadData()}
+            disabled={loading}
+            className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+            aria-label="Atualizar tudo"
+          >
+            <FiRefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} aria-hidden="true" />
+            Atualizar painel
+          </button>
         </div>
 
         {activeView === "orders" ? (
