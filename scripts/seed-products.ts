@@ -1,5 +1,6 @@
 import "reflect-metadata";
 import { loadEnvConfig } from "@next/env";
+import { DataSource } from "typeorm";
 
 loadEnvConfig(process.cwd());
 
@@ -14,7 +15,16 @@ const run = async () => {
       await AppDataSource.initialize();
     }
 
-    await seedDefaultProducts({ force: true });
+    const seedDataSource = new DataSource(AppDataSource.options);
+    try {
+      await seedDataSource.initialize();
+      await seedDefaultProducts({ force: true, dataSource: seedDataSource });
+    } finally {
+      if (seedDataSource.isInitialized) {
+        await seedDataSource.destroy();
+      }
+    }
+
     console.log("Produtos padrao sincronizados.");
   } finally {
     if (AppDataSource.isInitialized) {

@@ -1,3 +1,4 @@
+import { DataSource } from "typeorm";
 import AppDataSource from "./data-source";
 import { Product } from "../entities/Product";
 import { buildProductTags, defaultProducts } from "./catalog";
@@ -8,8 +9,9 @@ const legacyTitles: Record<string, string[]> = {
   elite: ["Pacote Elite"],
 };
 
-export const seedDefaultProducts = async (options: { force?: boolean } = {}) => {
-  const productRepository = AppDataSource.getRepository(Product);
+export const seedDefaultProducts = async (options: { force?: boolean; dataSource?: DataSource } = {}) => {
+  const dataSource = options.dataSource || AppDataSource;
+  const productRepository = dataSource.getRepository(Product);
   const existingProducts = await productRepository.find();
 
   for (const seed of defaultProducts) {
@@ -89,7 +91,7 @@ export const ensureDataSource = async (options: { seedProducts?: boolean } = {})
   }
 
   if (options.seedProducts) {
-    await seedDefaultProducts();
+    await seedDefaultProducts({ dataSource: AppDataSource });
   }
 
   return AppDataSource;
