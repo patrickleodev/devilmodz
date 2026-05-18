@@ -10,17 +10,20 @@ const errorMessages: Record<string, string> = {
 import SignInClient from "./sign-in-client";
 
 type SignInPageProps = {
-  searchParams?: {
+  searchParams?: Promise<{
     callbackUrl?: string | string[];
     error?: string | string[];
-  };
+  }>;
 };
 
-export default function SignInPage({ searchParams }: SignInPageProps) {
-  const callbackUrl = Array.isArray(searchParams?.callbackUrl)
-    ? searchParams.callbackUrl[0]
-    : searchParams?.callbackUrl || "/";
-  const error = Array.isArray(searchParams?.error) ? searchParams.error[0] : searchParams?.error || "";
+export default async function SignInPage({ searchParams }: SignInPageProps) {
+  const resolvedSearchParams = await searchParams;
+  const callbackUrl = Array.isArray(resolvedSearchParams?.callbackUrl)
+    ? resolvedSearchParams.callbackUrl[0]
+    : resolvedSearchParams?.callbackUrl || "/";
+  const error = Array.isArray(resolvedSearchParams?.error)
+    ? resolvedSearchParams.error[0]
+    : resolvedSearchParams?.error || "";
   const message = errorMessages[error] || errorMessages.Default;
 
   return (

@@ -10,10 +10,10 @@ const withSerializedQueryRunners = async <T>(dataSource: DataSource, task: () =>
 
   dataSource.createQueryRunner = ((mode?: "master" | "slave") => {
     const queryRunner = originalCreateQueryRunner(mode);
-    const originalQuery = queryRunner.query.bind(queryRunner);
+    const originalQuery = queryRunner.query.bind(queryRunner) as typeof queryRunner.query;
 
-    queryRunner.query = ((...args: unknown[]) => {
-      const execution = queue.then(() => originalQuery(...(args as [unknown[], unknown?])));
+    queryRunner.query = ((...args: Parameters<typeof queryRunner.query>) => {
+      const execution = queue.then(() => originalQuery(...args));
       queue = execution.then(() => undefined, () => undefined);
       return execution;
     }) as typeof queryRunner.query;
