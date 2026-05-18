@@ -388,7 +388,13 @@ export default function AdminDashboard() {
         body: JSON.stringify(body),
       });
 
-      const payload = (await response.json()) as { error?: string; threadUrl?: string };
+      const raw = await response.text();
+      let payload: { error?: string; threadUrl?: string } = {};
+      try {
+        payload = raw ? (JSON.parse(raw) as { error?: string; threadUrl?: string }) : {};
+      } catch {
+        payload = { error: raw || "Resposta invalida do servidor" };
+      }
 
       if (!response.ok) {
         throw new Error(payload.error || "Falha ao atualizar pedido");

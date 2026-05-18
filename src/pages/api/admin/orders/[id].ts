@@ -24,31 +24,32 @@ type TicketOrderDetails = {
 };
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const session = await getServerSession(req, res, authOptions);
-  const sessionUser = session?.user as { roles?: string[] } | undefined;
+  try {
+    const session = await getServerSession(req, res, authOptions);
+    const sessionUser = session?.user as { roles?: string[]; email?: string } | undefined;
 
-  if (!isAdminRole(sessionUser?.roles)) {
-    return res.status(403).json({ error: "Forbidden" });
-  }
+    if (!isAdminRole(sessionUser?.roles)) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
 
-  const id = req.query.id;
+    const id = req.query.id;
 
-  if (typeof id !== "string") {
-    return res.status(400).json({ error: "Invalid order id" });
-  }
+    if (typeof id !== "string") {
+      return res.status(400).json({ error: "Invalid order id" });
+    }
 
-  const dataSource = await ensureDataSource();
-  const orderRepository = dataSource.getRepository(Order);
-  const paymentRepository = dataSource.getRepository(Payment);
-  const deliveryLogRepository = dataSource.getRepository(DeliveryLog);
-  const order = await orderRepository.findOneBy({ id });
+    const dataSource = await ensureDataSource();
+    const orderRepository = dataSource.getRepository(Order);
+    const paymentRepository = dataSource.getRepository(Payment);
+    const deliveryLogRepository = dataSource.getRepository(DeliveryLog);
+    const order = await orderRepository.findOneBy({ id });
 
-  if (!order) {
-    return res.status(404).json({ error: "Order not found" });
-  }
+    if (!order) {
+      return res.status(404).json({ error: "Order not found" });
+    }
 
-  if (req.method === "PATCH") {
-    const { status, action } = req.body as { status?: string; action?: string };
+    if (req.method === "PATCH") {
+      const { status, action } = req.body as { status?: string; action?: string };
 
     if (action === "refund") {
       const payment = await paymentRepository.findOneBy({ orderId: order.id, provider: "infinitepay" });
@@ -160,13 +161,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(200).json({ order: updatedOrder });
     }
 
-    return res.status(400).json({ error: "Nothing to update" });
-  }
+      return res.status(400).json({ error: "Nothing to update" });
+    }
 
-  if (req.method === "GET") {
-    return res.status(200).json({ order });
-  }
+    if (req.method === "GET") {
+      return res.status(200).json({ order });
+    }
 
-  res.setHeader("Allow", ["GET", "PATCH"]);
-  return res.status(405).json({ error: "Method not allowed" });
+    res.setHeader("Allow", ["GET", "PATCH"]);
+    return res.status(405).json({ error: "Method not allowed" });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unexpected error";
+    return res.status(500).json({ error: message });
+  }
 }
