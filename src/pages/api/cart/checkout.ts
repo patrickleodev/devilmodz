@@ -77,7 +77,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       handle,
       items: ipItems,
       order_nsu: firstOrderId,
-      metadata: { orderId: firstOrderId, orderIds: createdOrders },
+      metadata: { orderId: firstOrderId, orderIds: createdOrders.join(",") },
       webhook_url: notificationUrl,
       redirect_url: `${getAppBaseUrl()}/`,
     };
