@@ -46,6 +46,8 @@ const getBotUserId = async (): Promise<string> => {
   return botUser.id;
 };
 
+const isTicketDebug = process.env.DEBUG_TICKETS === "1" || process.env.NODE_ENV !== "production";
+
 type DiscordChannelMessage = {
   id: string;
   channel_id: string;
@@ -148,6 +150,7 @@ export const createOrderTicketThread = async (input: {
   providerLabel?: string | null;
 }) => {
   console.log("[Discord] Iniciando criação de ticket para ordem:", input.orderId);
+  if (isTicketDebug) console.log('[Discord][DEBUG] createOrderTicketThread input:', JSON.stringify(input));
   
   const channelId = getTicketChannelId();
 
@@ -174,8 +177,7 @@ export const createOrderTicketThread = async (input: {
     });
 
     const clientId = extractClientIdFromMention(input.mention);
-    console.log("[Discord] Mention string recebida:", input.mention);
-    console.log("[Discord] Client ID extraído:", clientId);
+    if (isTicketDebug) console.log("[Discord][DEBUG] Mention string:", input.mention, "-> clientId:", clientId);
 
     const guildId = getGuildId();
 
@@ -185,8 +187,10 @@ export const createOrderTicketThread = async (input: {
       try {
         const member = (await createRestClient().get(`/guilds/${guildId}/members/${clientId}`)) as any;
         userLabel = (member.nick || member.user?.username || member.user?.global_name || null) as string | null;
+        if (isTicketDebug) console.log('[Discord][DEBUG] Resolved guild member for', clientId, ':', { nick: member.nick, username: member.user?.username, global_name: member.user?.global_name });
       } catch (err) {
         console.warn('[Discord] Falha ao buscar membro do guild para extrair username (continuando):', err instanceof Error ? err.message : err);
+        if (isTicketDebug) console.warn('[Discord][DEBUG] member fetch error', err);
       }
     }
 
@@ -201,6 +205,10 @@ export const createOrderTicketThread = async (input: {
       : `pedido-${input.orderId.slice(0, 8)}`;
     const ticketName = sanitizeDiscordChannelName(rawTicketName);
 
+    if (isTicketDebug) console.log('[Discord][DEBUG] rawTicketName:', rawTicketName);
+    const ticketNameSanitized = sanitizeDiscordChannelName(rawTicketName);
+    if (isTicketDebug) console.log('[Discord][DEBUG] sanitized ticket name:', ticketNameSanitized);
+
     const existingTicket = await findExistingTicketByName({
       channelId,
       channelType: channel.type,
@@ -208,15 +216,17 @@ export const createOrderTicketThread = async (input: {
       ticketName,
       clientId,
     });
-
     if (existingTicket) {
       console.log("[Discord] Ticket existente encontrado; reusando e postando mensagem:", existingTicket.threadId);
+      if (isTicketDebug) console.log('[Discord][DEBUG] existingTicket object:', existingTicket);
       try {
         await createRestClient().post(Routes.channelMessages(existingTicket.threadId), {
           body: { content: buildOrderCreatedMessage({ orderId: input.orderId, productTitle: input.productTitle, amount: input.amount, mention: input.mention || null, userEmail: input.userEmail || null }) },
         });
+        if (isTicketDebug) console.log('[Discord][DEBUG] posted order created message to existing ticket', existingTicket.threadId);
       } catch (err) {
         console.warn('[Discord] Falha ao postar mensagem no ticket existente:', err instanceof Error ? err.message : err);
+        if (isTicketDebug) console.warn('[Discord][DEBUG] post to existing ticket error', err);
       }
 
       return existingTicket;
