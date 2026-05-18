@@ -384,6 +384,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const payloadOrderIds = collectOrderIdsFromPayload(transaction).filter((value) => UUID_PATTERN.test(value));
     const targetOrderIds = Array.from(new Set([order.id, ...payloadOrderIds]));
 
+    console.log("[InfinitePay Webhook] Payload order IDs collected:", payloadOrderIds);
+    console.log("[InfinitePay Webhook] Target order IDs to process:", targetOrderIds);
+    console.log("[InfinitePay Webhook] Primary order:", order.id);
+
     const existingPayment =
       (await paymentRepository.findOne({
         where: {
@@ -455,8 +459,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
         for (const targetOrderId of targetOrderIds) {
           if (targetOrderId === order.id) {
+            console.log("[InfinitePay Webhook] Skipping primary order ID in sibling processing:", targetOrderId);
             continue;
           }
+
+          console.log("[InfinitePay Webhook] Processing sibling order:", targetOrderId);
 
           try {
             const [siblingOrder] = (await dataSource.query(
