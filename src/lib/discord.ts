@@ -652,6 +652,24 @@ export const closeTicketAndGetTranscript = async (threadId?: string | null) => {
   }
 };
 
+export const doesDiscordChannelExist = async (channelId?: string | null): Promise<boolean | null> => {
+  if (!channelId) return false;
+
+  try {
+    await createRestClient().get(Routes.channel(channelId));
+    return true;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (message.includes("Unknown Channel") || message.includes("10003")) {
+      return false;
+    }
+
+    // Unknown/transient Discord API error: do not assume channel is gone.
+    console.warn("[Discord] Failed to verify channel existence:", message);
+    return null;
+  }
+};
+
 export const createInviteLink = async (channelId?: string | null) => {
   const targetChannel = channelId || getTicketChannelId();
 

@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "../../../../lib/auth";
 import { ensureDataSource } from "../../../../lib/db";
 import { isAdminRole } from "../../../../lib/admin";
+import { doesDiscordChannelExist } from "../../../../lib/discord";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const session = await getServerSession(req, res, authOptions);
@@ -18,7 +19,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const dataSource = await ensureDataSource();
-  const orders = await dataSource.query(`
+  const orders = (await dataSource.query(`
     SELECT
       o."id",
       o."status",
@@ -42,7 +43,30 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     LEFT JOIN "users" u ON u."id" = o."userId"
     LEFT JOIN "products" p ON p."id" = o."productId"
     ORDER BY o."createdAt" DESC
-  `);
+  `)) as Array<{
+    id: string;
+    discordThreadId?: string | null;
+    discordThreadUrl?: string | null;
+    [key: string]: unknown;
+  }>;
+
+  const staleOrderIds: string[] = [];
+  for (const order of orders) {
+    if (!order.discordThreadId) continue;
+    const exists = await doesDiscordChannelExist(order.discordThreadId);
+    if (exists === false) {
+      staleOrderIds.push(order.id);
+      order.discordThreadId = null;
+      order.discordThreadUrl = null;
+    }
+  }
+
+  if (staleOrderIds.length > 0) {
+    await dataSource.query(
+      `UPDATE "orders" SET "discordThreadId" = NULL, "discordThreadUrl" = NULL WHERE "id" = ANY($1::uuid[])`,
+      [staleOrderIds]
+    );
+  }
 
   return res.status(200).json({ orders });
 }

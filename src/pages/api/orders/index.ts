@@ -6,6 +6,7 @@ import { Order } from "../../../entities/Order";
 import { Product } from "../../../entities/Product";
 import { Payment } from "../../../entities/Payment";
 import { resolveDbUser } from "../../../lib/session";
+import { doesDiscordChannelExist } from "../../../lib/discord";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   res.setHeader('Cache-Control', 'no-store');
@@ -71,6 +72,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const detailed = await Promise.all(
       orders.map(async (o) => {
+        let discordThreadId = o.discordThreadId || null;
+        let discordThreadUrl = o.discordThreadUrl || null;
+        if (discordThreadId) {
+          const exists = await doesDiscordChannelExist(discordThreadId);
+          if (exists === false) {
+            discordThreadId = null;
+            discordThreadUrl = null;
+            if (hasDiscordThreadId) {
+              if (hasDiscordThreadUrl) {
+                await ds.query(`UPDATE "orders" SET "discordThreadId" = NULL, "discordThreadUrl" = NULL WHERE "id" = $1`, [o.id]);
+              } else {
+                await ds.query(`UPDATE "orders" SET "discordThreadId" = NULL WHERE "id" = $1`, [o.id]);
+              }
+            }
+          }
+        }
+
         const product = await productRepo.findOneBy({ id: o.productId });
         const payments = await paymentRepo.find({ where: { orderId: o.id } });
         const payment =
@@ -79,8 +97,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           null;
         return {
           ...o,
-          discordThreadId: o.discordThreadId || null,
-          discordThreadUrl: o.discordThreadUrl || null,
+          discordThreadId,
+          discordThreadUrl,
           product,
           payment,
         };
