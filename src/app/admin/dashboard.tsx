@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { FiEdit2, FiEye, FiX, FiSave, FiRefreshCw } from "react-icons/fi";
+import { FiChevronLeft, FiChevronRight, FiEdit2, FiEye, FiX, FiSave, FiRefreshCw } from "react-icons/fi";
 
 type AdminProduct = {
   id: string;
@@ -56,6 +56,55 @@ const emptyProductForm = {
 };
 
 const statusOptions = ["pending", "paid", "completed", "processing", "delivered", "refunded"];
+const adminPageSize = 10;
+
+type PaginationControlsProps = {
+  page: number;
+  pageCount: number;
+  total: number;
+  label: string;
+  onPageChange: (page: number) => void;
+};
+
+function PaginationControls({ page, pageCount, total, label, onPageChange }: PaginationControlsProps) {
+  if (total <= adminPageSize) {
+    return null;
+  }
+
+  const start = (page - 1) * adminPageSize + 1;
+  const end = Math.min(page * adminPageSize, total);
+
+  return (
+    <div className="flex flex-col gap-3 border-t border-white/10 pt-4 text-sm text-slate-300 sm:flex-row sm:items-center sm:justify-between">
+      <p>
+        Exibindo {start}-{end} de {total} {label}
+      </p>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => onPageChange(Math.max(1, page - 1))}
+          disabled={page <= 1}
+          className="inline-flex cursor-pointer items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-3 py-2 font-medium text-slate-200 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <FiChevronLeft className="h-4 w-4" aria-hidden="true" />
+          Anterior
+        </button>
+        <span className="rounded-2xl bg-white/5 px-3 py-2 font-medium text-white">
+          {page}/{pageCount}
+        </span>
+        <button
+          type="button"
+          onClick={() => onPageChange(Math.min(pageCount, page + 1))}
+          disabled={page >= pageCount}
+          className="inline-flex cursor-pointer items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-3 py-2 font-medium text-slate-200 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Proxima
+          <FiChevronRight className="h-4 w-4" aria-hidden="true" />
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export default function AdminDashboard() {
   const [products, setProducts] = useState<AdminProduct[]>([]);
@@ -69,6 +118,8 @@ export default function AdminDashboard() {
   const [message, setMessage] = useState<string | null>(null);
   const [showDemoPreview, setShowDemoPreview] = useState(false);
   const [activeView, setActiveView] = useState<"orders" | "clients" | "products">("orders");
+  const [ordersPage, setOrdersPage] = useState(1);
+  const [clientsPage, setClientsPage] = useState(1);
 
   const money = useMemo(() => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }), []);
 
@@ -462,6 +513,20 @@ export default function AdminDashboard() {
     }
   };
 
+  const displayedOrders = showDemoPreview ? buildDemoOrdersAdmin(45) : orders;
+  const ordersPageCount = Math.max(1, Math.ceil(displayedOrders.length / adminPageSize));
+  const clientsPageCount = Math.max(1, Math.ceil(users.length / adminPageSize));
+  const safeOrdersPage = Math.min(ordersPage, ordersPageCount);
+  const safeClientsPage = Math.min(clientsPage, clientsPageCount);
+  const paginatedOrders = useMemo(
+    () => displayedOrders.slice((safeOrdersPage - 1) * adminPageSize, safeOrdersPage * adminPageSize),
+    [displayedOrders, safeOrdersPage]
+  );
+  const paginatedUsers = useMemo(
+    () => users.slice((safeClientsPage - 1) * adminPageSize, safeClientsPage * adminPageSize),
+    [users, safeClientsPage]
+  );
+
   const isBusy = (orderId: string) => Boolean(actionState?.startsWith(`${orderId}:`));
 
   const { customProducts, nonCustomProducts } = useMemo(() => {
@@ -545,7 +610,10 @@ export default function AdminDashboard() {
             {process.env.NODE_ENV !== "production" ? (
               <button
                 type="button"
-                onClick={() => setShowDemoPreview((c) => !c)}
+                onClick={() => {
+                  setShowDemoPreview((current) => !current);
+                  setOrdersPage(1);
+                }}
                 className={`inline-flex cursor-pointer items-center gap-2 rounded-2xl px-4 py-2 text-sm font-semibold transition ${
                   showDemoPreview ? "bg-cyan-400 text-slate-950" : "bg-rose-400/10 text-rose-100"
                 }`}
@@ -556,155 +624,175 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-          {activeView === "orders" ? (
+        {activeView === "orders" ? (
           <section className="grid gap-4">
             {loading ? (
               <p className="text-sm text-slate-400">Carregando pedidos...</p>
-            ) : !showDemoPreview && orders.length === 0 ? (
+            ) : displayedOrders.length === 0 ? (
               <p className="text-sm text-slate-400">Nenhum pedido encontrado.</p>
             ) : (
-              (showDemoPreview ? buildDemoOrdersAdmin(45) : orders).map((order) => (
-                <article key={order.id} className={`rounded-2xl border ${normalizeTags(order.product?.tags).includes("custom:plan") ? "border-violet-500/30 bg-violet-500/5" : "border-white/10 bg-slate-950/70"} p-5`}>
-                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                    <div className="min-w-0">
-                      <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Pedido {order.id.slice(0, 8)}</p>
-                      <div className="flex items-center gap-2 mt-2">
-                        <h2 className="text-xl font-semibold text-white">
-                          {order.product?.title || order.product?.id || "Produto removido"}
-                        </h2>
-                        {normalizeTags(order.product?.tags).includes("custom:plan") && (
-                          <span className="rounded-full border border-violet-400/30 bg-violet-400/10 px-2 py-1 text-xs font-medium text-violet-300">
-                            Personalizado
-                          </span>
-                        )}
-                      </div>
-                      {normalizeTags(order.product?.tags).includes("custom:plan") && (
-                        <div className="mt-3 flex gap-3 text-xs text-slate-300">
-                          {(() => {
-                            const tagsArray = normalizeTags(order.product?.tags);
-                            const moneyVal = tagsArray.find((t) => t.startsWith("money:"))?.split(":")[1] || "0";
-                            const clothes = tagsArray.find((t) => t.startsWith("clothes:"))?.split(":")[1] || "0";
-                            const cars = tagsArray.find((t) => t.startsWith("cars:"))?.split(":")[1] || "0";
-                            return (
-                              <>
-                                <span className="rounded-md bg-emerald-500/15 px-2 py-1">💰 Dinheiro: {moneyVal}M</span>
-                                <span className="rounded-md bg-cyan-500/15 px-2 py-1">👕 Trajes: {clothes}</span>
-                                <span className="rounded-md bg-pink-500/15 px-2 py-1">🚗 Carros: {cars}</span>
-                              </>
-                            );
-                          })()}
+              <>
+                {paginatedOrders.map((order) => (
+                  <article key={order.id} className={`rounded-2xl border ${normalizeTags(order.product?.tags).includes("custom:plan") ? "border-violet-500/30 bg-violet-500/5" : "border-white/10 bg-slate-950/70"} p-5`}>
+                    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                      <div className="min-w-0">
+                        <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Pedido {order.id.slice(0, 8)}</p>
+                        <div className="flex items-center gap-2 mt-2">
+                          <h2 className="text-xl font-semibold text-white">
+                            {order.product?.title || order.product?.id || "Produto removido"}
+                          </h2>
+                          {normalizeTags(order.product?.tags).includes("custom:plan") && (
+                            <span className="rounded-full border border-violet-400/30 bg-violet-400/10 px-2 py-1 text-xs font-medium text-violet-300">
+                              Personalizado
+                            </span>
+                          )}
                         </div>
-                      )}
-                      <p className="mt-2 text-sm text-slate-400">
-                        {order.user?.email || order.user?.name || "Cliente sem identificacao"}
-                      </p>
+                        {normalizeTags(order.product?.tags).includes("custom:plan") && (
+                          <div className="mt-3 flex gap-3 text-xs text-slate-300">
+                            {(() => {
+                              const tagsArray = normalizeTags(order.product?.tags);
+                              const moneyVal = tagsArray.find((t) => t.startsWith("money:"))?.split(":")[1] || "0";
+                              const clothes = tagsArray.find((t) => t.startsWith("clothes:"))?.split(":")[1] || "0";
+                              const cars = tagsArray.find((t) => t.startsWith("cars:"))?.split(":")[1] || "0";
+                              return (
+                                <>
+                                  <span className="rounded-md bg-emerald-500/15 px-2 py-1">💰 Dinheiro: {moneyVal}M</span>
+                                  <span className="rounded-md bg-cyan-500/15 px-2 py-1">👕 Trajes: {clothes}</span>
+                                  <span className="rounded-md bg-pink-500/15 px-2 py-1">🚗 Carros: {cars}</span>
+                                </>
+                              );
+                            })()}
+                          </div>
+                        )}
+                        <p className="mt-2 text-sm text-slate-400">
+                          {order.user?.email || order.user?.name || "Cliente sem identificacao"}
+                        </p>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2 text-sm">
+                        <span className="rounded-full bg-white/5 px-3 py-1 text-slate-200">{order.status}</span>
+                        <span className="rounded-full bg-white/5 px-3 py-1 text-slate-200">{money.format(order.amount)}</span>
+                        <span className="rounded-full bg-white/5 px-3 py-1 text-slate-200">
+                          {formatAdminDateTime(order.createdAt)}
+                        </span>
+                      </div>
                     </div>
 
-                    <div className="flex flex-wrap gap-2 text-sm">
-                      <span className="rounded-full bg-white/5 px-3 py-1 text-slate-200">{order.status}</span>
-                      <span className="rounded-full bg-white/5 px-3 py-1 text-slate-200">{money.format(order.amount)}</span>
-                      <span className="rounded-full bg-white/5 px-3 py-1 text-slate-200">
-                        {formatAdminDateTime(order.createdAt)}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="mt-5 flex flex-col gap-3 md:flex-row md:flex-wrap">
-                    <select
-                      value={order.status}
-                      onChange={(event) => updateOrder(order.id, { status: event.target.value })}
-                      disabled={isBusy(order.id)}
-                      className="cursor-pointer rounded-2xl border border-white/10 bg-slate-900 px-4 py-2 text-sm text-white outline-none disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {statusOptions.map((status) => (
-                        <option key={status} value={status}>
-                          {status}
-                        </option>
-                      ))}
-                    </select>
-                    <button
-                      onClick={() => updateOrder(order.id, { action: "deliver" })}
-                      disabled={isBusy(order.id)}
-                      className="cursor-pointer rounded-2xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-2 text-sm font-medium text-emerald-100 transition hover:bg-emerald-400/20 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      Entregar
-                    </button>
-                    <button
-                      onClick={() => updateOrder(order.id, { action: "refund" })}
-                      disabled={isBusy(order.id)}
-                      className="cursor-pointer rounded-2xl border border-rose-400/20 bg-rose-400/10 px-4 py-2 text-sm font-medium text-rose-100 transition hover:bg-rose-400/20 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      Reembolsar
-                    </button>
-                    {order.discordThreadUrl ? (
-                      <>
-                        <a
-                          href={order.discordThreadUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-center text-sm font-medium text-white transition hover:bg-white/10"
-                        >
-                          Abrir no Discord
-                        </a>
-                        <button
-                          onClick={() => updateOrder(order.id, { action: "close-ticket" })}
-                          disabled={isBusy(order.id)}
-                          className="cursor-pointer rounded-2xl border border-amber-400/20 bg-amber-400/10 px-4 py-2 text-sm font-medium text-amber-100 transition hover:bg-amber-400/20 disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          Encerrar ticket
-                        </button>
-                      </>
-                    ) : (
-                      <button
-                        onClick={() => updateOrder(order.id, { action: "open-ticket" })}
+                    <div className="mt-5 flex flex-col gap-3 md:flex-row md:flex-wrap">
+                      <select
+                        value={order.status}
+                        onChange={(event) => updateOrder(order.id, { status: event.target.value })}
                         disabled={isBusy(order.id)}
-                          className="cursor-pointer rounded-2xl border border-cyan-400/20 bg-cyan-400/10 px-4 py-2 text-sm font-medium text-cyan-100 transition hover:bg-cyan-400/20 disabled:cursor-not-allowed disabled:opacity-60"
+                        className="cursor-pointer rounded-2xl border border-white/10 bg-slate-900 px-4 py-2 text-sm text-white outline-none disabled:cursor-not-allowed disabled:opacity-60"
                       >
-                        Criar ticket
+                        {statusOptions.map((status) => (
+                          <option key={status} value={status}>
+                            {status}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={() => updateOrder(order.id, { action: "deliver" })}
+                        disabled={isBusy(order.id)}
+                        className="cursor-pointer rounded-2xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-2 text-sm font-medium text-emerald-100 transition hover:bg-emerald-400/20 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        Entregar
                       </button>
-                    )}
-                    <button
-                      onClick={() => void downloadTranscript(order.id)}
-                      disabled={isBusy(order.id)}
-                      className="cursor-pointer rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-slate-200 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {actionState === `${order.id}:download-transcript` ? "Baixando..." : "Baixar transcript"}
-                    </button>
-                  </div>
-                </article>
-              ))
+                      <button
+                        onClick={() => updateOrder(order.id, { action: "refund" })}
+                        disabled={isBusy(order.id)}
+                        className="cursor-pointer rounded-2xl border border-rose-400/20 bg-rose-400/10 px-4 py-2 text-sm font-medium text-rose-100 transition hover:bg-rose-400/20 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        Reembolsar
+                      </button>
+                      {order.discordThreadUrl ? (
+                        <>
+                          <a
+                            href={order.discordThreadUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-center text-sm font-medium text-white transition hover:bg-white/10"
+                          >
+                            Abrir no Discord
+                          </a>
+                          <button
+                            onClick={() => updateOrder(order.id, { action: "close-ticket" })}
+                            disabled={isBusy(order.id)}
+                            className="cursor-pointer rounded-2xl border border-amber-400/20 bg-amber-400/10 px-4 py-2 text-sm font-medium text-amber-100 transition hover:bg-amber-400/20 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            Encerrar ticket
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          onClick={() => updateOrder(order.id, { action: "open-ticket" })}
+                          disabled={isBusy(order.id)}
+                          className="cursor-pointer rounded-2xl border border-cyan-400/20 bg-cyan-400/10 px-4 py-2 text-sm font-medium text-cyan-100 transition hover:bg-cyan-400/20 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          Criar ticket
+                        </button>
+                      )}
+                      <button
+                        onClick={() => void downloadTranscript(order.id)}
+                        disabled={isBusy(order.id)}
+                        className="cursor-pointer rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-slate-200 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {actionState === `${order.id}:download-transcript` ? "Baixando..." : "Baixar transcript"}
+                      </button>
+                    </div>
+                  </article>
+                ))}
+                <PaginationControls
+                  page={safeOrdersPage}
+                  pageCount={ordersPageCount}
+                  total={displayedOrders.length}
+                  label="pedidos"
+                  onPageChange={setOrdersPage}
+                />
+              </>
             )}
           </section>
         ) : null}
 
         {activeView === "clients" ? (
-          <section className="grid gap-4 lg:grid-cols-2">
+          <section className="grid gap-4">
             {loading ? (
               <p className="text-sm text-slate-400">Carregando clientes...</p>
             ) : users.length === 0 ? (
               <p className="text-sm text-slate-400">Nenhum cliente encontrado.</p>
             ) : (
-              users.map((user) => (
-                <article key={user.id} className="rounded-2xl border border-white/10 bg-slate-950/70 p-5">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="min-w-0">
-                      <h2 className="truncate text-lg font-semibold text-white">{user.name || user.email || "Cliente"}</h2>
-                      <p className="mt-1 truncate text-sm text-slate-400">{user.email || "Sem e-mail"}</p>
-                      <p className="mt-1 text-xs text-slate-500">Discord: {user.discordId || "Nao vinculado"}</p>
-                    </div>
-                    <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-200">
-                      {Array.isArray(user.roles) ? user.roles.join(", ") || "cliente" : user.roles || "cliente"}
-                    </span>
-                  </div>
-                  <div className="mt-4 grid gap-2 text-sm text-slate-300 sm:grid-cols-3">
-                    <span className="rounded-2xl bg-white/5 px-3 py-2">Pedidos: {user.ordersCount}</span>
-                    <span className="rounded-2xl bg-white/5 px-3 py-2">Total: {money.format(user.totalSpent || 0)}</span>
-                    <span className="rounded-2xl bg-white/5 px-3 py-2">
-                      Ultimo: {formatAdminDate(user.lastOrderAt)}
-                    </span>
-                  </div>
-                </article>
-              ))
+              <>
+                <div className="grid gap-4 lg:grid-cols-2">
+                  {paginatedUsers.map((user) => (
+                    <article key={user.id} className="rounded-2xl border border-white/10 bg-slate-950/70 p-5">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="min-w-0">
+                          <h2 className="truncate text-lg font-semibold text-white">{user.name || user.email || "Cliente"}</h2>
+                          <p className="mt-1 truncate text-sm text-slate-400">{user.email || "Sem e-mail"}</p>
+                          <p className="mt-1 text-xs text-slate-500">Discord: {user.discordId || "Nao vinculado"}</p>
+                        </div>
+                        <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-200">
+                          {Array.isArray(user.roles) ? user.roles.join(", ") || "cliente" : user.roles || "cliente"}
+                        </span>
+                      </div>
+                      <div className="mt-4 grid gap-2 text-sm text-slate-300 sm:grid-cols-3">
+                        <span className="rounded-2xl bg-white/5 px-3 py-2">Pedidos: {user.ordersCount}</span>
+                        <span className="rounded-2xl bg-white/5 px-3 py-2">Total: {money.format(user.totalSpent || 0)}</span>
+                        <span className="rounded-2xl bg-white/5 px-3 py-2">
+                          Ultimo: {formatAdminDate(user.lastOrderAt)}
+                        </span>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+                <PaginationControls
+                  page={safeClientsPage}
+                  pageCount={clientsPageCount}
+                  total={users.length}
+                  label="clientes"
+                  onPageChange={setClientsPage}
+                />
+              </>
             )}
           </section>
         ) : null}
