@@ -62,8 +62,6 @@ const client = new pg.Client({
     console.log("  - payments");
     console.log("  - delivery_logs");
     console.log("  - cart_items");
-    console.log("");
-    console.log("⚠️  Para recriar produtos padrão, rode: npm run db:seed");
 
     await client.end();
   } catch (error) {
