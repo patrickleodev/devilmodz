@@ -158,7 +158,15 @@ const findOrderForWebhook = async (
   payload: any,
   transactionId?: string | null
 ) => {
-  const orderId = String(payload?.metadata?.orderId || payload?.external_reference || payload?.reference || "");
+  const orderId = String(
+    payload?.metadata?.orderId ||
+      payload?.metadata?.order_nsu ||
+      payload?.order_nsu ||
+      payload?.external_reference ||
+      payload?.reference ||
+      payload?.data?.order_nsu ||
+      ""
+  );
 
   if (orderId) {
     const loaded = await loadOrderById(dataSource, orderId);
