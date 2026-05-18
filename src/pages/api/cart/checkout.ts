@@ -83,12 +83,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     };
 
     const checkoutRes = (await createCheckoutLink(payload)) as CheckoutResponse;
+    const paymentUrl = checkoutRes.url || checkoutRes.link || (checkoutRes.slug ? `https://checkout.infinitepay.io/${handle}/${checkoutRes.slug}` : undefined);
+    const providerPaymentId = checkoutRes.id || paymentUrl || checkoutRes.link || checkoutRes.slug || "";
 
     // attach provider id to all orders (use raw UPDATE)
     if (createdOrders.length > 0) {
       await ds.query(
         `UPDATE "orders" SET "mpPreferenceId" = $2 WHERE "id" = ANY($1::uuid[])`,
-        [createdOrders, checkoutRes.id || ""]
+        [createdOrders, providerPaymentId]
       );
     }
 
@@ -98,17 +100,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         paymentRepo.create({
           orderId,
           provider: "infinitepay",
-          providerPaymentId: checkoutRes.id || "",
+          providerPaymentId,
           status: "pending",
-          rawPayload: checkoutRes,
+          rawPayload: { request: payload, response: checkoutRes, paymentUrl },
         })
       );
     }
 
     // Clear the cart after checkout
     await cartRepo.delete({ userId: dbUser.id });
-
-    const paymentUrl = checkoutRes.url || checkoutRes.link || (checkoutRes.slug ? `https://checkout.infinitepay.io/${handle}/${checkoutRes.slug}` : undefined);
 
     return res.status(200).json({ orderIds: createdOrders, provider: "infinitepay", paymentUrl, initPoint: paymentUrl });
   } catch (err) {

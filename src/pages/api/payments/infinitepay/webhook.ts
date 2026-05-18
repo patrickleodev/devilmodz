@@ -381,13 +381,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     console.log("[InfinitePay Webhook] Mapped payment status:", payment.status, "->", newStatus);
 
-    const payloadOrderIds = collectOrderIdsFromPayload(transaction).filter((value) => UUID_PATTERN.test(value));
-    const targetOrderIds = Array.from(new Set([order.id, ...payloadOrderIds]));
-
-    console.log("[InfinitePay Webhook] Payload order IDs collected:", payloadOrderIds);
-    console.log("[InfinitePay Webhook] Target order IDs to process:", targetOrderIds);
-    console.log("[InfinitePay Webhook] Primary order:", order.id);
-
     const existingPayment =
       (await paymentRepository.findOne({
         where: {
@@ -396,15 +389,56 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         },
       })) || payment;
 
+    const originalProviderPaymentId = existingPayment.providerPaymentId || payment.providerPaymentId || null;
+
     existingPayment.provider = "infinitepay";
     existingPayment.orderId = order.id;
-    existingPayment.providerPaymentId = transactionId || checkoutId || existingPayment.providerPaymentId;
+    existingPayment.providerPaymentId = existingPayment.providerPaymentId || checkoutId || transactionId || undefined;
     existingPayment.status = newStatus;
     existingPayment.rawPayload = { ...existingPayment.rawPayload, ...req.body, ...transaction };
+
+    const payloadOrderIds = collectOrderIdsFromPayload(transaction).filter((value) => UUID_PATTERN.test(value));
+    const providerPaymentIds = Array.from(
+      new Set([originalProviderPaymentId, existingPayment.providerPaymentId, checkoutId, transactionId].filter(Boolean))
+    );
+    const relatedPayments = providerPaymentIds.length
+      ? ((await dataSource.query(
+          `SELECT DISTINCT "orderId" FROM "payments" WHERE "provider" = 'infinitepay' AND "providerPaymentId" = ANY($1::text[])`,
+          [providerPaymentIds]
+        )) as Array<{ orderId?: string }>)
+      : [];
+    const relatedOrderIds = relatedPayments.map((p) => p.orderId).filter((value): value is string => Boolean(value));
+    const targetOrderIds = Array.from(new Set([order.id, ...payloadOrderIds, ...relatedOrderIds]));
+
+    console.log("[InfinitePay Webhook] Payload order IDs collected:", payloadOrderIds);
+    console.log("[InfinitePay Webhook] Provider payment IDs collected:", providerPaymentIds);
+    console.log("[InfinitePay Webhook] Related order IDs collected:", relatedOrderIds);
+    console.log("[InfinitePay Webhook] Target order IDs to process:", targetOrderIds);
+    console.log("[InfinitePay Webhook] Primary order:", order.id);
 
     if (newStatus === "paid" || newStatus === "completed") {
       console.log("[InfinitePay Webhook] Pagamento confirmado para ordem:", order.id);
       console.log("[InfinitePay Webhook] Order status:", order.status, "Order discordThreadId:", order.discordThreadId);
+      
+      // FIRST: Ensure ALL related orders are marked as completed immediately
+      console.log("[InfinitePay Webhook] Marking all related orders as completed...");
+      if (providerPaymentIds.length > 0) {
+        const allPayments = await dataSource.query(
+          `SELECT DISTINCT "orderId" FROM "payments" WHERE "provider" = 'infinitepay' AND "providerPaymentId" = ANY($1::text[])`,
+          [providerPaymentIds]
+        );
+        
+        const allOrderIds = allPayments.map((p: any) => p.orderId).filter(Boolean);
+        if (allOrderIds.length > 0) {
+          console.log("[InfinitePay Webhook] Found", allOrderIds.length, "related orders:", allOrderIds);
+          await dataSource.query(
+            `UPDATE "orders" SET "status" = $1 WHERE "id" = ANY($2::uuid[])`,
+            [newStatus, allOrderIds]
+          );
+          console.log("[InfinitePay Webhook] Bulk marked all orders as", newStatus);
+        }
+      }
+      
       existingPayment.confirmedAt = existingPayment.confirmedAt || new Date();
 
       if (!order.discordThreadId) {
@@ -456,83 +490,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             console.error("[InfinitePay Webhook] Failed to update order status:", updateErr instanceof Error ? updateErr.message : String(updateErr));
           }
         }
-
-        for (const targetOrderId of targetOrderIds) {
-          if (targetOrderId === order.id) {
-            console.log("[InfinitePay Webhook] Skipping primary order ID in sibling processing:", targetOrderId);
-            continue;
-          }
-
-          console.log("[InfinitePay Webhook] Processing sibling order:", targetOrderId);
-
-          try {
-            const [siblingOrder] = (await dataSource.query(
-              `SELECT "id", "userId", "productId", "amount", "status", "createdAt", "discordThreadId", "discordThreadUrl"
-               FROM "orders"
-               WHERE "id" = $1`,
-              [targetOrderId]
-            )) as Array<OrderRow>;
-
-            if (!siblingOrder) {
-              console.warn("[InfinitePay Webhook] Skipping missing sibling order:", targetOrderId);
-              continue;
-            }
-
-            const siblingPayment =
-              (await paymentRepository.findOne({
-                where: {
-                  orderId: siblingOrder.id,
-                  provider: "infinitepay",
-                },
-              })) ||
-              paymentRepository.create({
-                orderId: siblingOrder.id,
-                provider: "infinitepay",
-                providerPaymentId: transactionId ?? checkoutId ?? undefined,
-                status: newStatus,
-                rawPayload: transaction,
-              } as Partial<Payment>);
-
-            siblingPayment.provider = "infinitepay";
-            siblingPayment.orderId = siblingOrder.id;
-            siblingPayment.providerPaymentId = transactionId || checkoutId || siblingPayment.providerPaymentId;
-            siblingPayment.status = newStatus;
-            siblingPayment.rawPayload = { ...siblingPayment.rawPayload, ...req.body, ...transaction };
-            siblingPayment.confirmedAt = siblingPayment.confirmedAt || new Date();
-
-            const [siblingProduct, siblingUser] = await Promise.all([
-              productRepository.findOneBy({ id: siblingOrder.productId }),
-              userRepository.findOneBy({ id: siblingOrder.userId }),
-            ]);
-
-            let siblingTicket: { threadId: string; threadUrl: string | null } | null =
-              siblingOrder.discordThreadId && siblingOrder.discordThreadUrl
-                ? { threadId: siblingOrder.discordThreadId, threadUrl: siblingOrder.discordThreadUrl }
-                : null;
-
-            if (!siblingTicket) {
-              siblingTicket = await createOrderTicketThread({
-                orderId: siblingOrder.id,
-                productTitle: siblingProduct?.title || "Unknown Product",
-                amount: siblingOrder.amount,
-                mention: siblingUser?.discordId ? `<@${siblingUser.discordId}>` : null,
-                userEmail: siblingUser?.email || null,
-                userName: siblingUser?.name || null,
-                providerLabel: "InfinitePay",
-              });
-            }
-
-            await paymentRepository.save(siblingPayment);
-            await updateOrderStatus(dataSource, siblingOrder.id, "completed", siblingTicket || undefined);
-            console.log("[InfinitePay Webhook] Processed sibling order from the same checkout:", siblingOrder.id);
-          } catch (siblingErr) {
-            console.error(
-              "[InfinitePay Webhook] Failed processing sibling order:",
-              targetOrderId,
-              siblingErr instanceof Error ? siblingErr.message : String(siblingErr)
-            );
-          }
-        }
       } else {
         console.log("[InfinitePay Webhook] Order already has discordThreadId:", order.discordThreadId, "- skipping ticket creation");
         await updateOrderStatus(dataSource, order.id, "completed", {
@@ -540,38 +497,88 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           threadUrl: order.discordThreadUrl || undefined,
         });
       }
+
+      for (const targetOrderId of targetOrderIds) {
+        if (targetOrderId === order.id) {
+          console.log("[InfinitePay Webhook] Skipping primary order ID in sibling processing:", targetOrderId);
+          continue;
+        }
+
+        console.log("[InfinitePay Webhook] Processing sibling order:", targetOrderId);
+
+        try {
+          const [siblingOrder] = (await dataSource.query(
+            `SELECT "id", "userId", "productId", "amount", "status", "createdAt", "discordThreadId", "discordThreadUrl"
+             FROM "orders"
+             WHERE "id" = $1`,
+            [targetOrderId]
+          )) as Array<OrderRow>;
+
+          if (!siblingOrder) {
+            console.warn("[InfinitePay Webhook] Skipping missing sibling order:", targetOrderId);
+            continue;
+          }
+
+          const siblingPayment =
+            (await paymentRepository.findOne({
+              where: {
+                orderId: siblingOrder.id,
+                provider: "infinitepay",
+              },
+            })) ||
+            paymentRepository.create({
+              orderId: siblingOrder.id,
+              provider: "infinitepay",
+              providerPaymentId: originalProviderPaymentId || checkoutId || transactionId || undefined,
+              status: newStatus,
+              rawPayload: transaction,
+            } as Partial<Payment>);
+
+          siblingPayment.provider = "infinitepay";
+          siblingPayment.orderId = siblingOrder.id;
+          siblingPayment.providerPaymentId = siblingPayment.providerPaymentId || originalProviderPaymentId || checkoutId || transactionId || undefined;
+          siblingPayment.status = newStatus;
+          siblingPayment.rawPayload = { ...siblingPayment.rawPayload, ...req.body, ...transaction };
+          siblingPayment.confirmedAt = siblingPayment.confirmedAt || new Date();
+
+          const [siblingProduct, siblingUser] = await Promise.all([
+            productRepository.findOneBy({ id: siblingOrder.productId }),
+            userRepository.findOneBy({ id: siblingOrder.userId }),
+          ]);
+
+          let siblingTicket: { threadId: string; threadUrl: string | null } | null =
+            siblingOrder.discordThreadId && siblingOrder.discordThreadUrl
+              ? { threadId: siblingOrder.discordThreadId, threadUrl: siblingOrder.discordThreadUrl }
+              : null;
+
+          if (!siblingTicket) {
+            siblingTicket = await createOrderTicketThread({
+              orderId: siblingOrder.id,
+              productTitle: siblingProduct?.title || "Unknown Product",
+              amount: siblingOrder.amount,
+              mention: siblingUser?.discordId ? `<@${siblingUser.discordId}>` : null,
+              userEmail: siblingUser?.email || null,
+              userName: siblingUser?.name || null,
+              providerLabel: "InfinitePay",
+            });
+          }
+
+          await paymentRepository.save(siblingPayment);
+          await updateOrderStatus(dataSource, siblingOrder.id, "completed", siblingTicket || undefined);
+          console.log("[InfinitePay Webhook] Processed sibling order from the same checkout:", siblingOrder.id);
+        } catch (siblingErr) {
+          console.error(
+            "[InfinitePay Webhook] Failed processing sibling order:",
+            targetOrderId,
+            siblingErr instanceof Error ? siblingErr.message : String(siblingErr)
+          );
+        }
+      }
     } else {
       console.log("[InfinitePay Webhook] Payment status is not paid/completed, skipping ticket creation. Status:", newStatus);
     }
 
     await paymentRepository.save(existingPayment);
-
-    // Ensure ALL payments for this checkout are updated (in case multiple orders)
-    if ((newStatus === "paid" || newStatus === "completed") && (checkoutId || transactionId)) {
-      const providerPaymentId = checkoutId || transactionId;
-      await dataSource.query(
-        `UPDATE "payments" SET "status" = $1, "confirmedAt" = COALESCE("confirmedAt", NOW())
-         WHERE "provider" = 'infinitepay' AND "providerPaymentId" = $2`,
-        [newStatus, providerPaymentId]
-      );
-      
-      // Also update all related orders to completed status
-      const allPayments = await dataSource.query(
-        `SELECT "orderId" FROM "payments" WHERE "provider" = 'infinitepay' AND "providerPaymentId" = $1`,
-        [providerPaymentId]
-      );
-      
-      const orderIds = allPayments.map((p: any) => p.orderId).filter(Boolean);
-      if (orderIds.length > 0) {
-        await dataSource.query(
-          `UPDATE "orders" SET "status" = $1 WHERE "id" = ANY($2::uuid[])`,
-          [newStatus, orderIds]
-        );
-        console.log("[InfinitePay Webhook] Bulk updated orders to completed:", orderIds);
-      }
-      
-      console.log("[InfinitePay Webhook] Bulk updated all payments for providerPaymentId:", providerPaymentId, "to status:", newStatus);
-    }
 
     return res.status(200).json({ ok: true });
   } catch (error) {
