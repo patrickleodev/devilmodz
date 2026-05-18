@@ -546,6 +546,33 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     await paymentRepository.save(existingPayment);
 
+    // Ensure ALL payments for this checkout are updated (in case multiple orders)
+    if ((newStatus === "paid" || newStatus === "completed") && (checkoutId || transactionId)) {
+      const providerPaymentId = checkoutId || transactionId;
+      await dataSource.query(
+        `UPDATE "payment" SET "status" = $1, "confirmedAt" = COALESCE("confirmedAt", NOW())
+         WHERE "provider" = 'infinitepay' AND "providerPaymentId" = $2`,
+        [newStatus, providerPaymentId]
+      );
+      
+      // Also update all related orders to completed status
+      const allPayments = await dataSource.query(
+        `SELECT "orderId" FROM "payment" WHERE "provider" = 'infinitepay' AND "providerPaymentId" = $1`,
+        [providerPaymentId]
+      );
+      
+      const orderIds = allPayments.map((p: any) => p.orderId).filter(Boolean);
+      if (orderIds.length > 0) {
+        await dataSource.query(
+          `UPDATE "orders" SET "status" = $1 WHERE "id" = ANY($2::uuid[])`,
+          [newStatus, orderIds]
+        );
+        console.log("[InfinitePay Webhook] Bulk updated orders to completed:", orderIds);
+      }
+      
+      console.log("[InfinitePay Webhook] Bulk updated all payments for providerPaymentId:", providerPaymentId, "to status:", newStatus);
+    }
+
     return res.status(200).json({ ok: true });
   } catch (error) {
     // eslint-disable-next-line no-console
