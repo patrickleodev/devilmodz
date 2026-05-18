@@ -87,7 +87,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // attach provider id to all orders (use raw UPDATE)
     if (createdOrders.length > 0) {
       await ds.query(
-        `UPDATE "orders" SET "mpPreferenceId" = $2 WHERE "id" = ANY($1::text[])`,
+        `UPDATE "orders" SET "mpPreferenceId" = $2 WHERE "id" = ANY($1::uuid[])`,
         [createdOrders, checkoutRes.id || ""]
       );
     }
