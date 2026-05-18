@@ -487,7 +487,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               userRepository.findOneBy({ id: siblingOrder.userId }),
             ]);
 
-            let siblingTicket =
+            let siblingTicket: { threadId: string; threadUrl: string | null } | null =
               siblingOrder.discordThreadId && siblingOrder.discordThreadUrl
                 ? { threadId: siblingOrder.discordThreadId, threadUrl: siblingOrder.discordThreadUrl }
                 : null;
