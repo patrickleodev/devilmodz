@@ -255,6 +255,39 @@ export default function AdminDashboard() {
       ? raw.split(",").map((t) => t.trim()).filter(Boolean)
       : [];
 
+  const formatAdminDateTime = (value?: string | null) => {
+    if (!value) {
+      return "-";
+    }
+
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return "-";
+    }
+
+    return new Intl.DateTimeFormat("pt-BR", {
+      dateStyle: "short",
+      timeStyle: "short",
+      timeZone: "America/Sao_Paulo",
+    }).format(date);
+  };
+
+  const formatAdminDate = (value?: string | null) => {
+    if (!value) {
+      return "-";
+    }
+
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return "-";
+    }
+
+    return new Intl.DateTimeFormat("pt-BR", {
+      dateStyle: "short",
+      timeZone: "America/Sao_Paulo",
+    }).format(date);
+  };
+
   const deleteProduct = async (product: AdminProduct) => {
     const confirmed = window.confirm(`Excluir o produto "${product.title}"? Essa acao nao pode ser desfeita.`);
 
@@ -440,7 +473,7 @@ export default function AdminDashboard() {
                       <span className="rounded-full bg-white/5 px-3 py-1 text-slate-200">{order.status}</span>
                       <span className="rounded-full bg-white/5 px-3 py-1 text-slate-200">{money.format(order.amount)}</span>
                       <span className="rounded-full bg-white/5 px-3 py-1 text-slate-200">
-                        {new Date(order.createdAt).toLocaleString("pt-BR")}
+                        {formatAdminDateTime(order.createdAt)}
                       </span>
                     </div>
                   </div>
@@ -529,7 +562,7 @@ export default function AdminDashboard() {
                     <span className="rounded-2xl bg-white/5 px-3 py-2">Pedidos: {user.ordersCount}</span>
                     <span className="rounded-2xl bg-white/5 px-3 py-2">Total: {money.format(user.totalSpent || 0)}</span>
                     <span className="rounded-2xl bg-white/5 px-3 py-2">
-                      Ultimo: {user.lastOrderAt ? new Date(user.lastOrderAt).toLocaleDateString("pt-BR") : "-"}
+                      Ultimo: {formatAdminDate(user.lastOrderAt)}
                     </span>
                   </div>
                 </article>
