@@ -18,6 +18,7 @@ type TicketOrderDetails = {
   discordThreadUrl?: string | null;
   userEmail?: string | null;
   userDiscordId?: string | null;
+  userName?: string | null;
   productTitle?: string | null;
 };
 
