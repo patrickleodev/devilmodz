@@ -167,6 +167,17 @@ const collectOrderIdsFromPayload = (payload: any) => {
     }
 
     if (typeof value === "string") {
+      // Try to parse as JSON array first
+      try {
+        const parsed = JSON.parse(value);
+        if (Array.isArray(parsed)) {
+          pushValue(parsed);
+          return;
+        }
+      } catch {
+        // Not JSON, treat as comma-separated string
+      }
+      
       rawValues.push(...value.split(","));
       return;
     }
