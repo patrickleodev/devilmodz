@@ -84,15 +84,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const checkoutRes = (await createCheckoutLink(payload)) as CheckoutResponse;
 
-    // attach provider id to first order if available (use raw UPDATE)
-    if (firstOrderId) {
+    // attach provider id to all orders (use raw UPDATE)
+    if (createdOrders.length > 0) {
       await ds.query(
-        `UPDATE "orders" SET "mpPreferenceId" = $2 WHERE "id" = $1`,
-        [firstOrderId, checkoutRes.id || ""]
+        `UPDATE "orders" SET "mpPreferenceId" = $2 WHERE "id" = ANY($1::text[])`,
+        [createdOrders, checkoutRes.id || ""]
       );
     }
 
-    await paymentRepo.save(paymentRepo.create({ orderId: firstOrderId || "", provider: "infinitepay", providerPaymentId: checkoutRes.id || "", status: "pending", rawPayload: checkoutRes }));
+    // Create payment records for ALL orders in the cart
+    for (const orderId of createdOrders) {
+      await paymentRepo.save(
+        paymentRepo.create({
+          orderId,
+          provider: "infinitepay",
+          providerPaymentId: checkoutRes.id || "",
+          status: "pending",
+          rawPayload: checkoutRes,
+        })
+      );
+    }
 
     // Clear the cart after checkout
     await cartRepo.delete({ userId: dbUser.id });
