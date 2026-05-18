@@ -403,6 +403,59 @@ export default function AdminDashboard() {
     }
   };
 
+  const downloadTranscript = async (orderId: string) => {
+    setActionState(`${orderId}:download-transcript`);
+    setMessage(null);
+
+    try {
+      const response = await fetch(`/api/admin/orders/${orderId}/transcript`);
+      const payload = (await response.json()) as {
+        error?: string;
+        orderId?: string;
+        recordedAt?: string;
+        deliveredBy?: string | null;
+        source?: string | null;
+        closedAt?: string | null;
+        threadId?: string | null;
+        messageCount?: number;
+        transcript?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(payload.error || "Transcript nao encontrado");
+      }
+
+      const header = [
+        `Order ID: ${payload.orderId || orderId}`,
+        `Recorded At: ${payload.recordedAt || "-"}`,
+        `Closed At: ${payload.closedAt || "-"}`,
+        `Source: ${payload.source || "-"}`,
+        `Thread ID: ${payload.threadId || "-"}`,
+        `Message Count: ${payload.messageCount || 0}`,
+        `Recorded By: ${payload.deliveredBy || "-"}`,
+        "",
+        "==== Transcript ====",
+        "",
+      ].join("\n");
+
+      const text = `${header}${payload.transcript || ""}`;
+      const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `ticket-transcript-${orderId.slice(0, 8)}.txt`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
+      URL.revokeObjectURL(url);
+      setMessage("Transcript baixado com sucesso.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Erro ao baixar transcript");
+    } finally {
+      setActionState(null);
+    }
+  };
+
   const isBusy = (orderId: string) => Boolean(actionState?.startsWith(`${orderId}:`));
 
   const { customProducts, nonCustomProducts } = useMemo(() => {
@@ -604,6 +657,13 @@ export default function AdminDashboard() {
                         Criar ticket
                       </button>
                     )}
+                    <button
+                      onClick={() => void downloadTranscript(order.id)}
+                      disabled={isBusy(order.id)}
+                      className="cursor-pointer rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-slate-200 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {actionState === `${order.id}:download-transcript` ? "Baixando..." : "Baixar transcript"}
+                    </button>
                   </div>
                 </article>
               ))

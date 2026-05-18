@@ -3,9 +3,10 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "../../../../lib/auth";
 import { Order } from "../../../../entities/Order";
 import { Payment } from "../../../../entities/Payment";
+import { DeliveryLog } from "../../../../entities/DeliveryLog";
 import { ensureDataSource } from "../../../../lib/db";
 import { isAdminRole } from "../../../../lib/admin";
-import { archiveThread, createOrderTicketThread } from "../../../../lib/discord";
+import { closeTicketAndGetTranscript, createOrderTicketThread } from "../../../../lib/discord";
 import { refundInfinitePayTransaction } from "../../../../lib/infinitepay";
 
 type TicketOrderDetails = {
@@ -39,6 +40,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const dataSource = await ensureDataSource();
   const orderRepository = dataSource.getRepository(Order);
   const paymentRepository = dataSource.getRepository(Payment);
+  const deliveryLogRepository = dataSource.getRepository(DeliveryLog);
   const order = await orderRepository.findOneBy({ id });
 
   if (!order) {
@@ -125,11 +127,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(400).json({ error: "No ticket to close" });
       }
 
-      const ok = await archiveThread(order.discordThreadId);
+      const closeResult = await closeTicketAndGetTranscript(order.discordThreadId);
 
-      if (!ok) {
+      if (!closeResult.ok) {
         return res.status(500).json({ error: "Failed to archive thread" });
       }
+
+      await deliveryLogRepository.save(
+        deliveryLogRepository.create({
+          orderId: order.id,
+          deliveredBy: `admin:${session?.user?.email || "unknown"}`,
+          message: JSON.stringify({
+            type: "ticket_transcript",
+            source: "admin-close-ticket",
+            threadId: order.discordThreadId,
+            closedAt: new Date().toISOString(),
+            messageCount: closeResult.messageCount,
+            transcript: closeResult.transcript || "",
+          }),
+        })
+      );
 
       order.discordThreadId = undefined;
       order.discordThreadUrl = undefined;

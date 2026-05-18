@@ -23,7 +23,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       o."id",
       o."status",
       o."amount"::float AS "amount",
-      o."createdAt",
+      to_char(o."createdAt", 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "createdAt",
       o."discordThreadId",
       o."discordThreadUrl",
       json_build_object(

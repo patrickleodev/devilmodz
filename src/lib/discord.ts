@@ -550,6 +550,108 @@ export const archiveThread = async (threadId?: string | null) => {
   }
 };
 
+type DiscordFetchedMessage = {
+  id: string;
+  content?: string;
+  timestamp?: string;
+  author?: {
+    id?: string;
+    username?: string;
+    global_name?: string;
+  };
+  attachments?: Array<{
+    url?: string;
+    filename?: string;
+  }>;
+};
+
+const fetchChannelMessages = async (channelId: string, limit = 100, before?: string) => {
+  const query = new URLSearchParams({ limit: String(limit) });
+  if (before) query.set("before", before);
+  const path = `/channels/${channelId}/messages?${query.toString()}` as `/${string}`;
+  return (await createRestClient().get(path)) as DiscordFetchedMessage[];
+};
+
+const fetchTicketTranscript = async (threadId: string, maxMessages = 1000) => {
+  const all: DiscordFetchedMessage[] = [];
+  let before: string | undefined;
+
+  while (all.length < maxMessages) {
+    const chunk = await fetchChannelMessages(threadId, 100, before);
+    if (!chunk.length) break;
+    all.push(...chunk);
+    before = chunk[chunk.length - 1]?.id;
+    if (chunk.length < 100) break;
+  }
+
+  const sorted = all
+    .filter((msg) => Boolean(msg?.id))
+    .sort((a, b) => {
+      const at = new Date(a.timestamp || 0).getTime();
+      const bt = new Date(b.timestamp || 0).getTime();
+      return at - bt;
+    });
+
+  const lines = sorted.map((msg) => {
+    const author = msg.author?.global_name || msg.author?.username || msg.author?.id || "unknown";
+    const ts = msg.timestamp ? new Date(msg.timestamp).toISOString() : "unknown-time";
+    const content = (msg.content || "").trim();
+    const attachmentText = (msg.attachments || [])
+      .map((att) => att.url || att.filename)
+      .filter(Boolean)
+      .join(", ");
+    const parts = [`[${ts}]`, `${author}:`, content || "(sem texto)"];
+    if (attachmentText) parts.push(`anexos: ${attachmentText}`);
+    return parts.join(" ");
+  });
+
+  return {
+    messageCount: sorted.length,
+    transcript: lines.join("\n"),
+  };
+};
+
+const archiveDiscordTicketChannel = async (threadId: string) => {
+  const channel = (await createRestClient().get(Routes.channel(threadId))) as APIChannel & {
+    type?: number;
+  };
+
+  // Forum thread / public thread / private thread -> archive instead of deleting.
+  if (
+    channel.type === ChannelType.PublicThread ||
+    channel.type === ChannelType.PrivateThread ||
+    channel.type === ChannelType.AnnouncementThread
+  ) {
+    await createRestClient().patch(Routes.channel(threadId), {
+      body: { archived: true, locked: true },
+    });
+    return true;
+  }
+
+  // For text channels used as tickets, delete channel after transcript capture.
+  await createRestClient().delete(Routes.channel(threadId));
+  return true;
+};
+
+export const closeTicketAndGetTranscript = async (threadId?: string | null) => {
+  if (!threadId) {
+    return { ok: false, transcript: null, messageCount: 0 };
+  }
+
+  try {
+    const transcriptData = await fetchTicketTranscript(threadId);
+    await archiveDiscordTicketChannel(threadId);
+    return {
+      ok: true,
+      transcript: transcriptData.transcript,
+      messageCount: transcriptData.messageCount,
+    };
+  } catch (err) {
+    console.warn("Failed to close ticket and build transcript:", err);
+    return { ok: false, transcript: null, messageCount: 0 };
+  }
+};
+
 export const createInviteLink = async (channelId?: string | null) => {
   const targetChannel = channelId || getTicketChannelId();
 

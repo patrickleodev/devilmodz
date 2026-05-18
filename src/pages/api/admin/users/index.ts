@@ -25,10 +25,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       u."email",
       u."discordId",
       u."roles",
-      u."createdAt",
+      to_char(u."createdAt", 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "createdAt",
       COUNT(o."id")::int AS "ordersCount",
       COALESCE(SUM(o."amount"), 0)::float AS "totalSpent",
-      MAX(o."createdAt") AS "lastOrderAt"
+      to_char(MAX(o."createdAt"), 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "lastOrderAt"
     FROM "users" u
     LEFT JOIN "orders" o ON o."userId" = u."id"
     GROUP BY u."id"

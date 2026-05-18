@@ -2,8 +2,9 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "../../../../../lib/auth";
 import { ensureDataSource } from "../../../../../lib/db";
-import { archiveThread } from "../../../../../lib/discord";
+import { closeTicketAndGetTranscript } from "../../../../../lib/discord";
 import { resolveDbUser } from "../../../../../lib/session";
+import { DeliveryLog } from "../../../../../entities/DeliveryLog";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   res.setHeader('Cache-Control', 'no-store');
@@ -21,6 +22,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     const ds = await ensureDataSource();
+    const deliveryLogRepo = ds.getRepository(DeliveryLog);
 
     const dbUser = await resolveDbUser(sessionUser);
     if (!dbUser) return res.status(404).json({ error: "User not found" });
@@ -60,9 +62,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (!hasDiscordThreadId || !order.discordThreadId) return res.status(400).json({ error: "No ticket to close" });
 
-    const ok = await archiveThread(order.discordThreadId);
+    const closeResult = await closeTicketAndGetTranscript(order.discordThreadId);
 
-    if (!ok) return res.status(500).json({ error: "Failed to archive thread" });
+    if (!closeResult.ok) return res.status(500).json({ error: "Failed to archive thread" });
+
+    await deliveryLogRepo.save(
+      deliveryLogRepo.create({
+        orderId: id,
+        deliveredBy: `user:${dbUser.email || dbUser.id}`,
+        message: JSON.stringify({
+          type: "ticket_transcript",
+          source: "user-close-ticket",
+          threadId: order.discordThreadId,
+          closedAt: new Date().toISOString(),
+          messageCount: closeResult.messageCount,
+          transcript: closeResult.transcript || "",
+        }),
+      })
+    );
 
     if (hasDiscordThreadId) {
       if (hasDiscordThreadUrl) {
