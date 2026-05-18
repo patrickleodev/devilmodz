@@ -96,6 +96,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       handle,
       items,
       order_nsu: orderId,
+      metadata: { orderId },
       webhook_url: notificationUrl,
       redirect_url: `${getAppBaseUrl()}/`,
     };

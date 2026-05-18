@@ -17,6 +17,8 @@ type OrderRow = {
   discordThreadUrl?: string | null;
 };
 
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 const toOrderAmountCandidates = (rawAmount: number) => {
   const candidates = new Set<number>();
 
@@ -158,7 +160,7 @@ const findOrderForWebhook = async (
   payload: any,
   transactionId?: string | null
 ) => {
-  const orderId = String(
+  const rawOrderReference = String(
     payload?.metadata?.orderId ||
       payload?.metadata?.order_nsu ||
       payload?.order_nsu ||
@@ -168,11 +170,29 @@ const findOrderForWebhook = async (
       ""
   );
 
-  if (orderId) {
-    const loaded = await loadOrderById(dataSource, orderId);
-    if (loaded.order) {
-      return loaded.order;
+  const orderIdCandidates = rawOrderReference
+    .split(",")
+    .map((value) => value.trim())
+    .filter((value) => value.length > 0 && UUID_PATTERN.test(value));
+
+  if (rawOrderReference && orderIdCandidates.length > 0) {
+    if (orderIdCandidates.length > 1) {
+      console.warn("[InfinitePay Webhook] orderId had multiple UUID candidates; using the first one", {
+        rawOrderReference,
+        orderIdCandidates,
+      });
     }
+
+    for (const orderId of orderIdCandidates) {
+      const loaded = await loadOrderById(dataSource, orderId);
+      if (loaded.order) {
+        return loaded.order;
+      }
+    }
+  }
+
+  if (rawOrderReference && !orderIdCandidates.length) {
+    console.warn("[InfinitePay Webhook] Ignoring non-UUID order reference from payload", { rawOrderReference });
   }
 
   const payerEmail = payload?.metadata?.payerEmail || payload?.metadata?.email || payload?.customer?.email || null;

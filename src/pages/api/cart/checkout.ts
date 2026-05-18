@@ -71,10 +71,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const handle = process.env.INFINITEPAY_TAG;
     if (!handle) return res.status(500).json({ error: "INFINITEPAY_TAG not configured" });
 
+    const firstOrderId = createdOrders[0];
+
     const payload: Record<string, unknown> = {
       handle,
       items: ipItems,
-      order_nsu: createdOrders.join(","),
+      order_nsu: firstOrderId,
+      metadata: { orderId: firstOrderId, orderIds: createdOrders },
       webhook_url: notificationUrl,
       redirect_url: `${getAppBaseUrl()}/`,
     };
@@ -82,7 +85,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const checkoutRes = (await createCheckoutLink(payload)) as CheckoutResponse;
 
     // attach provider id to first order if available (use raw UPDATE)
-    const firstOrderId = createdOrders[0];
     if (firstOrderId) {
       await ds.query(
         `UPDATE "orders" SET "mpPreferenceId" = $2 WHERE "id" = $1`,
