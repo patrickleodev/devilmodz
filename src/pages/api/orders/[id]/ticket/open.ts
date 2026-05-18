@@ -81,6 +81,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       amount: order.amount,
       mention: dbUser.discordId ? `<@${dbUser.discordId}>` : null,
       userEmail: dbUser.email || null,
+      userName: (dbUser as any).name || null,
     });
 
     console.log("[Orders Ticket Open] Ticket creation result:", ticket);

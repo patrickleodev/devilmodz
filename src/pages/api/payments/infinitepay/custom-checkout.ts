@@ -116,6 +116,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         amount: total,
         mention: null,
         userEmail: dbUser.email || null,
+        userName: dbUser.name || null,
       });
 
       if (ticket?.threadId) {

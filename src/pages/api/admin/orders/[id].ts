@@ -81,6 +81,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           o."discordThreadUrl",
           u."email" AS "userEmail",
           u."discordId" AS "userDiscordId",
+          u."name" AS "userName",
           p."title" AS "productTitle"
         FROM "orders" o
         LEFT JOIN "users" u ON u."id" = o."userId"
@@ -105,6 +106,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         amount: details.amount,
         mention: details.userDiscordId ? `<@${details.userDiscordId}>` : null,
         userEmail: details.userEmail || null,
+        userName: details.userName || null,
       });
 
       if (!ticket?.threadId) {

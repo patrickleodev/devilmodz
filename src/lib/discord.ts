@@ -144,6 +144,7 @@ export const createOrderTicketThread = async (input: {
   amount: number;
   mention?: string | null;
   userEmail?: string | null;
+  userName?: string | null;
   providerLabel?: string | null;
 }) => {
   console.log("[Discord] Iniciando criação de ticket para ordem:", input.orderId);
@@ -189,8 +190,15 @@ export const createOrderTicketThread = async (input: {
       }
     }
 
-    // Fallback to order-based name when no user label available
-    const rawTicketName = userLabel ? `ticket-${userLabel}` : `pedido-${input.orderId.slice(0, 8)}`;
+    // Prefer explicit userName passed by server code, then guild username, then email local-part
+    const fallbackFromEmail = input.userEmail ? String(input.userEmail).split("@")[0] : null;
+    const rawTicketName = (input.userName && input.userName.trim())
+      ? `ticket-${input.userName.trim()}`
+      : userLabel
+      ? `ticket-${userLabel}`
+      : fallbackFromEmail
+      ? `ticket-${fallbackFromEmail}`
+      : `pedido-${input.orderId.slice(0, 8)}`;
     const ticketName = sanitizeDiscordChannelName(rawTicketName);
 
     const existingTicket = await findExistingTicketByName({
