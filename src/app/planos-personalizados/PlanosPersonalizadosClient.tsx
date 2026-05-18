@@ -39,9 +39,13 @@ export default function PlanosPersonalizadosClient() {
         throw new Error(data.error || "Erro ao adicionar ao carrinho");
       }
 
-      await res.json();
+      const data = await res.json();
 
       try {
+        if (data.items) {
+          const count = data.items.reduce((sum: number, item: { quantity?: number }) => sum + Number(item.quantity || 1), 0);
+          window.dispatchEvent(new CustomEvent("cart_count_changed", { detail: { count } }));
+        }
         window.dispatchEvent(new Event("cart_notify"));
       } catch {
         /* ignore */

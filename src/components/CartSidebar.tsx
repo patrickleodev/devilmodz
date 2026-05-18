@@ -5,12 +5,24 @@ import { useSession, signIn } from "next-auth/react";
 
 type CartItem = any;
 
+const getCartItemCount = (items: CartItem[]) => {
+  return items.reduce((sum, item) => sum + Number(item.quantity || 1), 0);
+};
+
+const notifyCartCountChanged = (items: CartItem[]) => {
+  window.dispatchEvent(new CustomEvent("cart_count_changed", { detail: { count: getCartItemCount(items) } }));
+};
+
 export default function CartSidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { data: session } = useSession();
   const [items, setItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const money = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+  const total = items.reduce(
+    (sum, item) => sum + Number(item.product?.price || 0) * Number(item.quantity || 1),
+    0
+  );
 
   const fetchCart = async () => {
     setLoading(true);
@@ -18,7 +30,9 @@ export default function CartSidebar({ open, onClose }: { open: boolean; onClose:
       const res = await fetch("/api/cart");
       const payload = await res.json();
       if (!res.ok) throw new Error(payload.error || "Failed to load cart");
-      setItems(payload.items || []);
+      const nextItems = payload.items || [];
+      setItems(nextItems);
+      notifyCartCountChanged(nextItems);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -38,6 +52,8 @@ export default function CartSidebar({ open, onClose }: { open: boolean; onClose:
   const handleClearCart = async () => {
     if (!session) return signIn("discord");
     await fetch("/api/cart", { method: "DELETE", body: JSON.stringify({ clearAll: true }), headers: { "Content-Type": "application/json" } });
+    setItems([]);
+    notifyCartCountChanged([]);
     fetchCart();
   };
 
@@ -114,6 +130,10 @@ export default function CartSidebar({ open, onClose }: { open: boolean; onClose:
 
         {session && items.length > 0 ? (
           <div className="mt-6 flex flex-col gap-3 border-t border-white/10 pt-6">
+            <div className="flex items-center justify-between px-1">
+              <span className="text-sm font-medium text-slate-300">Total</span>
+              <span className="text-lg font-semibold text-white">{money.format(total)}</span>
+            </div>
             <button onClick={handleCheckout} className="w-full cursor-pointer rounded-2xl bg-emerald-400 px-4 py-3 font-semibold text-slate-950">Finalizar compra</button>
             <button onClick={handleClearCart} className="w-full cursor-pointer bg-transparent px-0 py-0 text-center text-sm font-semibold text-slate-300 transition hover:text-white">Limpar carrinho</button>
           </div>

@@ -58,6 +58,8 @@ export default function PlanosPage() {
 
       // Notify the header to pulse the cart icon
       try {
+        const count = (payload.items || []).reduce((sum: number, item: { quantity?: number }) => sum + Number(item.quantity || 1), 0);
+        window.dispatchEvent(new CustomEvent("cart_count_changed", { detail: { count } }));
         window.dispatchEvent(new Event("cart_notify"));
       } catch {
         /* ignore */
