@@ -4,6 +4,30 @@ import { DataSource } from "typeorm";
 
 loadEnvConfig(process.cwd());
 
+const withSerializedQueryRunners = async <T>(dataSource: DataSource, task: () => Promise<T>) => {
+  const originalCreateQueryRunner = dataSource.createQueryRunner.bind(dataSource);
+  let queue = Promise.resolve();
+
+  dataSource.createQueryRunner = ((mode?: "master" | "slave") => {
+    const queryRunner = originalCreateQueryRunner(mode);
+    const originalQuery = queryRunner.query.bind(queryRunner);
+
+    queryRunner.query = ((...args: unknown[]) => {
+      const execution = queue.then(() => originalQuery(...(args as [unknown[], unknown?])));
+      queue = execution.then(() => undefined, () => undefined);
+      return execution;
+    }) as typeof queryRunner.query;
+
+    return queryRunner;
+  }) as typeof dataSource.createQueryRunner;
+
+  try {
+    return await task();
+  } finally {
+    dataSource.createQueryRunner = originalCreateQueryRunner;
+  }
+};
+
 const run = async () => {
   const [{ default: AppDataSource }, { seedDefaultProducts }] = await Promise.all([
     import("../src/lib/data-source"),
@@ -15,7 +39,9 @@ const run = async () => {
       await AppDataSource.initialize();
     }
 
-    await AppDataSource.synchronize(false);
+    await withSerializedQueryRunners(AppDataSource, async () => {
+      await AppDataSource.synchronize(false);
+    });
 
     const seedDataSource = new DataSource(AppDataSource.options);
     try {
