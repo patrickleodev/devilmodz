@@ -175,21 +175,42 @@ export const createOrderTicketThread = async (input: {
     const clientId = extractClientIdFromMention(input.mention);
     console.log("[Discord] Mention string recebida:", input.mention);
     console.log("[Discord] Client ID extraído:", clientId);
-    if (!clientId) {
-      console.warn("[Discord] Nenhum discordId encontrado para o cliente; ticket será criado sem acesso direto do cliente.");
+
+    const guildId = getGuildId();
+
+    // Resolve a display name to use for the ticket channel when possible
+    let userLabel: string | null = null;
+    if (clientId && guildId) {
+      try {
+        const member = (await createRestClient().get(`/guilds/${guildId}/members/${clientId}`)) as any;
+        userLabel = (member.nick || member.user?.username || member.user?.global_name || null) as string | null;
+      } catch (err) {
+        console.warn('[Discord] Falha ao buscar membro do guild para extrair username (continuando):', err instanceof Error ? err.message : err);
+      }
     }
 
-    const ticketName = `pedido-${input.orderId.slice(0, 8)}`;
+    // Fallback to order-based name when no user label available
+    const rawTicketName = userLabel ? `ticket-${userLabel}` : `pedido-${input.orderId.slice(0, 8)}`;
+    const ticketName = sanitizeDiscordChannelName(rawTicketName);
+
     const existingTicket = await findExistingTicketByName({
       channelId,
       channelType: channel.type,
-      guildId: getGuildId(),
+      guildId,
       ticketName,
       clientId,
     });
 
     if (existingTicket) {
-      console.log("[Discord] Ticket existente encontrado; reutilizando:", existingTicket.threadId);
+      console.log("[Discord] Ticket existente encontrado; reusando e postando mensagem:", existingTicket.threadId);
+      try {
+        await createRestClient().post(Routes.channelMessages(existingTicket.threadId), {
+          body: { content: buildOrderCreatedMessage({ orderId: input.orderId, productTitle: input.productTitle, amount: input.amount, mention: input.mention || null, userEmail: input.userEmail || null }) },
+        });
+      } catch (err) {
+        console.warn('[Discord] Falha ao postar mensagem no ticket existente:', err instanceof Error ? err.message : err);
+      }
+
       return existingTicket;
     }
 
@@ -466,6 +487,19 @@ const normalizeDiscordName = (name?: string | null) => {
 
 const isSameDiscordName = (actualName: string | undefined, expectedName: string) => {
   return normalizeDiscordName(actualName) === normalizeDiscordName(expectedName);
+};
+
+const sanitizeDiscordChannelName = (name?: string | null) => {
+  if (!name) return "ticket";
+  // lower-case, replace spaces with '-', keep letters, numbers, '-' and '_'
+  return String(name)
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9-_]/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 90);
 };
 
 const extractClientIdFromMention = (clientMentionStr?: string | null): string | null => {

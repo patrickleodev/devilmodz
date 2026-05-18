@@ -67,6 +67,7 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [actionState, setActionState] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [showDemoPreview, setShowDemoPreview] = useState(false);
   const [activeView, setActiveView] = useState<"orders" | "clients" | "products">("orders");
 
   const money = useMemo(() => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }), []);
@@ -288,6 +289,63 @@ export default function AdminDashboard() {
     }).format(date);
   };
 
+  const DEMO_PRODUCTS = [
+    { id: "starter", title: "Pacote Starter", price: 29.9, deliveryType: "digital", tags: ["badge:Starter"] },
+    { id: "pro", title: "Pacote Pro", price: 59.9, deliveryType: "digital", tags: ["badge:Pro"] },
+    { id: "elite", title: "Pacote Elite", price: 99.9, deliveryType: "manual", tags: ["badge:Elite"] },
+    { id: "premium", title: "Conta Premium", price: 149.9, deliveryType: "manual", tags: ["badge:Premium"] },
+  ];
+
+  const buildDemoOrdersAdmin = (count = 24): AdminOrder[] => {
+    const now = new Date();
+    const statuses = ["completed", "paid", "processing", "pending", "refunded"];
+
+    const dayOffsets = [0, 0, 1, 1, 2, 3, 4, 7, 10, 12, 14, 18, 20, 24, 28, 30];
+
+    const normalizedOffsets = Array.from({ length: count }, (_, index) => dayOffsets[index % dayOffsets.length] + Math.floor(index / dayOffsets.length) * 3);
+
+    return normalizedOffsets.map((dayOffset, index) => {
+      const timestamp = new Date(now);
+      timestamp.setDate(now.getDate() - dayOffset);
+      timestamp.setHours(9 + (index % 10), (index * 11) % 60, 0, 0);
+
+      // vary product and make some personalized
+      const base = DEMO_PRODUCTS[index % DEMO_PRODUCTS.length];
+      const isCustom = index % 7 === 0; // every 7th is personalized
+      const hasTicket = index % 4 === 0; // every 4th has a ticket
+
+      const product = {
+        id: isCustom ? `custom-${index}` : base.id,
+        title: isCustom ? `Plano Personalizado #${index + 1}` : base.title,
+        deliveryType: isCustom ? "manual" : (base as any).deliveryType || "digital",
+        tags: isCustom
+          ? ["custom:plan", `badge:Personalizado`, `money:${5 + (index % 5)}`]
+          : (base as any).tags || [],
+      };
+
+      const user = index % 3 === 0 ? { id: `user-${index}`, email: `cliente${index}@exemplo.com`, name: `Cliente ${index}` } : undefined;
+
+      const status = statuses[index % statuses.length];
+      const amount = Number(((isCustom ? 199.9 + (index % 3) * 20 : (base as any).price + (index % 4) * 10)).toFixed(2));
+
+      const order: AdminOrder & { payment?: any } = {
+        id: `demo-${String(index + 1).padStart(4, "0")}`,
+        status,
+        amount,
+        createdAt: timestamp.toISOString(),
+        product,
+        user,
+        discordThreadUrl: hasTicket ? `https://discord.com/channels/000/111/demo-thread-${index}` : null,
+      } as any;
+
+      if (status === "paid" || status === "completed") {
+        order.payment = { status: "paid", provider: index % 2 === 0 ? "demo" : "manual" };
+      }
+
+      return order as AdminOrder;
+    });
+  };
+
   const deleteProduct = async (product: AdminProduct) => {
     const confirmed = window.confirm(`Excluir o produto "${product.title}"? Essa acao nao pode ser desfeita.`);
 
@@ -413,26 +471,40 @@ export default function AdminDashboard() {
             ))}
           </div>
 
-          <button
-            type="button"
-            onClick={() => void loadData()}
-            disabled={loading}
-            className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
-            aria-label="Atualizar tudo"
-          >
-            <FiRefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} aria-hidden="true" />
-            Atualizar painel
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => void loadData()}
+              disabled={loading}
+              className="inline-flex cursor-pointer items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+              aria-label="Atualizar tudo"
+            >
+              <FiRefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} aria-hidden="true" />
+              Atualizar painel
+            </button>
+
+            {process.env.NODE_ENV !== "production" ? (
+              <button
+                type="button"
+                onClick={() => setShowDemoPreview((c) => !c)}
+                className={`inline-flex cursor-pointer items-center gap-2 rounded-2xl px-4 py-2 text-sm font-semibold transition ${
+                  showDemoPreview ? "bg-cyan-400 text-slate-950" : "bg-rose-400/10 text-rose-100"
+                }`}
+              >
+                {showDemoPreview ? "Ocultar pedidos de teste" : "Mostrar pedidos de teste"}
+              </button>
+            ) : null}
+          </div>
         </div>
 
-        {activeView === "orders" ? (
+          {activeView === "orders" ? (
           <section className="grid gap-4">
             {loading ? (
               <p className="text-sm text-slate-400">Carregando pedidos...</p>
-            ) : orders.length === 0 ? (
+            ) : !showDemoPreview && orders.length === 0 ? (
               <p className="text-sm text-slate-400">Nenhum pedido encontrado.</p>
             ) : (
-              orders.map((order) => (
+              (showDemoPreview ? buildDemoOrdersAdmin(45) : orders).map((order) => (
                 <article key={order.id} className={`rounded-2xl border ${normalizeTags(order.product?.tags).includes("custom:plan") ? "border-violet-500/30 bg-violet-500/5" : "border-white/10 bg-slate-950/70"} p-5`}>
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                     <div className="min-w-0">
@@ -582,7 +654,7 @@ export default function AdminDashboard() {
                 <div className="flex items-center gap-2">
                   <Link
                     href="/planos"
-                    className="inline-flex items-center gap-2 rounded-2xl bg-cyan-400 px-3 py-2 text-sm font-medium text-slate-950 transition hover:brightness-110"
+                    className="inline-flex items-center gap-2 rounded-2xl bg-cyan-400 px-3 py-2 text-sm font-medium !text-slate-900 transition hover:brightness-110"
                   >
                     Ver produtos
                   </Link>
