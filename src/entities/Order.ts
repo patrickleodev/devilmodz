@@ -13,8 +13,20 @@ export class Order {
   @Column({ type: "uuid" })
   userId!: string;
 
-  @Column({ type: "uuid" })
-  productId!: string;
+  @Column({ type: "uuid", nullable: true })
+  productId?: string | null;
+
+  @Column({ type: "text", nullable: true })
+  productTitle?: string | null;
+
+  @Column({ type: "text", nullable: true })
+  productDescription?: string | null;
+
+  @Column({ type: "text", nullable: true })
+  productDeliveryType?: string | null;
+
+  @Column("simple-array", { nullable: true })
+  productTags?: string[] | null;
 
   @Column({ type: "numeric", precision: 10, scale: 2, transformer: numericTransformer })
   amount!: number;

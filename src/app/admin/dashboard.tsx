@@ -142,7 +142,7 @@ export default function AdminDashboard() {
       paidRevenue,
       openTickets,
     };
-  }, [orders, products.length, users.length]);
+  }, [orders, products, users.length]);
 
   const loadData = async () => {
     setLoading(true);
@@ -187,7 +187,7 @@ export default function AdminDashboard() {
   };
 
   const restoreProducts = async () => {
-    const confirmed = window.confirm("Restaurar produtos vai remover todos os personalizados e manter apenas os 3 do seed. Continuar?");
+    const confirmed = window.confirm("Restaurar produtos vai reconstruir o catalogo padrao sem apagar pedidos nem planos personalizados ja comprados. Continuar?");
     if (!confirmed) return;
 
     setActionState("restore-products");
@@ -529,17 +529,10 @@ export default function AdminDashboard() {
 
   const isBusy = (orderId: string) => Boolean(actionState?.startsWith(`${orderId}:`));
 
-  const { customProducts, nonCustomProducts } = useMemo(() => {
-    const custom: AdminProduct[] = [];
-    const nonCustom: AdminProduct[] = [];
-    products.forEach((p) => {
-      const raw = (p as any).tags;
-      const tags = Array.isArray(raw) ? raw : typeof raw === "string" ? (raw as string).split(",").map((t) => t.trim()).filter(Boolean) : [];
-      if (tags.includes("custom:plan")) custom.push(p);
-      else nonCustom.push(p);
-    });
-    return { customProducts: custom, nonCustomProducts: nonCustom };
-  }, [products]);
+  const nonCustomProducts = useMemo(
+    () => products.filter((product) => !normalizeTags(product.tags).includes("custom:plan")),
+    [products]
+  );
 
   return (
     <main className="px-4 py-6 text-white sm:px-6 lg:px-10 lg:py-10">
@@ -975,15 +968,15 @@ export default function AdminDashboard() {
             <div className="grid gap-4 self-start">
               {loading ? (
                 <p className="text-sm text-slate-400">Carregando produtos...</p>
-              ) : products.filter(p => !normalizeTags(p.tags).includes("custom:plan")).length === 0 ? (
+              ) : nonCustomProducts.length === 0 ? (
                 <p className="text-sm text-slate-400">Nenhum produto encontrado.</p>
               ) : (
-                products.filter(p => !normalizeTags(p.tags).includes("custom:plan")).map((product) => {
+                nonCustomProducts.map((product) => {
                   const isEditingProduct = editingProductId === product.id;
                   const isCustomPlan = normalizeTags(product.tags).includes("custom:plan");
                   
                   // Extract custom plan details from tags
-                  let customPlanDetails = { money: 0, clothes: 0, cars: 0 };
+                  const customPlanDetails = { money: 0, clothes: 0, cars: 0 };
                   if (isCustomPlan) {
                     normalizeTags(product.tags).forEach((tag) => {
                       if (tag.startsWith("money:")) customPlanDetails.money = parseInt(tag.split(":")[1], 10);

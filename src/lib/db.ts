@@ -90,6 +90,70 @@ export const ensureDataSource = async (options: { seedProducts?: boolean } = {})
     );
   }
 
+  await AppDataSource.query(`ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "productTitle" text`);
+  await AppDataSource.query(`ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "productDescription" text`);
+  await AppDataSource.query(`ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "productDeliveryType" text`);
+  await AppDataSource.query(`ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "productTags" text`);
+  await AppDataSource.query(`ALTER TABLE "orders" ALTER COLUMN "productId" DROP NOT NULL`);
+  await AppDataSource.query(`ALTER TABLE "cart_items" ALTER COLUMN "productId" DROP NOT NULL`);
+  await AppDataSource.query(`ALTER TABLE "cart_items" ADD COLUMN IF NOT EXISTS "itemTitle" text`);
+  await AppDataSource.query(`ALTER TABLE "cart_items" ADD COLUMN IF NOT EXISTS "itemDescription" text`);
+  await AppDataSource.query(`ALTER TABLE "cart_items" ADD COLUMN IF NOT EXISTS "itemPrice" numeric(10,2)`);
+  await AppDataSource.query(`ALTER TABLE "cart_items" ADD COLUMN IF NOT EXISTS "itemDeliveryType" text`);
+  await AppDataSource.query(`ALTER TABLE "cart_items" ADD COLUMN IF NOT EXISTS "itemTags" text`);
+  await AppDataSource.query(
+    `UPDATE "orders" o
+     SET
+       "productTitle" = COALESCE(o."productTitle", p."title"),
+       "productDescription" = COALESCE(o."productDescription", p."description"),
+       "productDeliveryType" = COALESCE(o."productDeliveryType", p."deliveryType"),
+       "productTags" = COALESCE(o."productTags", p."tags")
+     FROM "products" p
+     WHERE o."productId" = p."id"
+       AND (
+         o."productTitle" IS NULL
+         OR o."productDescription" IS NULL
+         OR o."productDeliveryType" IS NULL
+         OR o."productTags" IS NULL
+       )`
+  );
+  await AppDataSource.query(
+    `UPDATE "cart_items" c
+     SET
+       "itemTitle" = COALESCE(c."itemTitle", p."title"),
+       "itemDescription" = COALESCE(c."itemDescription", p."description"),
+       "itemPrice" = COALESCE(c."itemPrice", p."price"),
+       "itemDeliveryType" = COALESCE(c."itemDeliveryType", p."deliveryType"),
+       "itemTags" = COALESCE(c."itemTags", p."tags"),
+       "productId" = NULL
+     FROM "products" p
+     WHERE c."productId" = p."id"
+       AND string_to_array(COALESCE(p."tags", ''), ',') @> ARRAY['custom:plan']`
+  );
+  await AppDataSource.query(
+    `UPDATE "orders" o
+     SET "productId" = NULL
+     FROM "products" p
+     WHERE o."productId" = p."id"
+       AND string_to_array(COALESCE(p."tags", ''), ',') @> ARRAY['custom:plan']`
+  );
+  await AppDataSource.query(
+    `UPDATE "orders" o
+     SET "productTitle" = COALESCE(
+       NULLIF(o."productTitle", ''),
+       NULLIF(pay."rawPayload" #>> '{request,items,0,description}', ''),
+       NULLIF(pay."rawPayload" #>> '{items,0,description}', '')
+     )
+     FROM "payments" pay
+     WHERE pay."orderId" = o."id"
+       AND pay."rawPayload" IS NOT NULL
+       AND (o."productTitle" IS NULL OR o."productTitle" = '')
+       AND (
+         NULLIF(pay."rawPayload" #>> '{request,items,0,description}', '') IS NOT NULL
+         OR NULLIF(pay."rawPayload" #>> '{items,0,description}', '') IS NOT NULL
+       )`
+  );
+
   if (options.seedProducts) {
     await seedDefaultProducts({ dataSource: AppDataSource });
   }

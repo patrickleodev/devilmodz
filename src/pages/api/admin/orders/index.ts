@@ -34,10 +34,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         'discordId', u."discordId"
       ) AS "user",
       json_build_object(
-        'id', p."id",
-        'title', p."title",
-        'deliveryType', p."deliveryType",
-        'tags', CASE WHEN p."tags" IS NULL THEN '[]'::json ELSE array_to_json(string_to_array(p."tags", ',')) END
+        'id', COALESCE(p."id"::text, o."productId"::text),
+        'title', COALESCE(p."title", o."productTitle"),
+        'deliveryType', COALESCE(p."deliveryType", o."productDeliveryType"),
+        'tags', CASE
+          WHEN COALESCE(p."tags", o."productTags") IS NULL THEN '[]'::json
+          ELSE array_to_json(string_to_array(COALESCE(p."tags", o."productTags"), ','))
+        END
       ) AS "product"
     FROM "orders" o
     LEFT JOIN "users" u ON u."id" = o."userId"

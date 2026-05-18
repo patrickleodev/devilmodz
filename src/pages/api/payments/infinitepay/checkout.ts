@@ -24,6 +24,13 @@ type CheckoutResponse = {
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+const serializeTags = (tags: Product["tags"] | string | null | undefined) =>
+  Array.isArray(tags)
+    ? tags.join(",")
+    : typeof tags === "string"
+      ? tags
+      : null;
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   res.setHeader("Cache-Control", "no-store");
 
@@ -69,10 +76,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const unitPrice = Number(product.price || 0);
     const amount = unitPrice * quantity;
     const result = await dataSource.query(
-      `INSERT INTO "orders" ("userId", "productId", "amount", "status")
-       VALUES ($1, $2, $3, $4)
+      `INSERT INTO "orders" (
+         "userId",
+         "productId",
+         "amount",
+         "status",
+         "productTitle",
+         "productDescription",
+         "productDeliveryType",
+         "productTags"
+       )
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING "id"`,
-      [dbUser.id, product.id, amount, "pending"]
+      [
+        dbUser.id,
+        product.id,
+        amount,
+        "pending",
+        product.title,
+        product.description,
+        product.deliveryType,
+        serializeTags(product.tags),
+      ]
     );
 
     const savedOrderId = result?.[0]?.id as string | undefined;

@@ -45,38 +45,41 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const carrosSubtotal = carrosValue * PRICE_PER_CARRO;
   const total = milhoesSubtotal + trajesSubtotal + carrosSubtotal;
   const label = `Plano Personalizado`;
+  const customPlanDescription = `Plano customizado gerado pelo usuario.`;
+  const customPlanTags = [
+    "custom:plan",
+    "badge:Personalizado",
+    `money:${milhoesValue}`,
+    `clothes:${trajesValue}`,
+    `cars:${carrosValue}`,
+  ];
 
   // Valor mínimo para criar checkout (R$2.00)
   if (total < 2) {
     return res.status(400).json({ error: "Valor mínimo para checkout é R$2,00" });
   }
 
-  // Cria produto, pedido, pagamento e checkout link
+  // Cria pedido, pagamento e checkout link
   try {
     const ds = await ensureDataSource();
     const dbUser = await resolveDbUser(sessionUser);
     if (!dbUser) return res.status(404).json({ error: "User not found" });
 
-    // Create a temporary product for this custom plan
-    const productInsert = await ds.query(
-      `INSERT INTO "products" (title, description, price, stock, "deliveryType", tags) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
-      [
-        `Plano Personalizado`,
-        `Plano customizado gerado pelo usuário.`,
-        total,
-        0,
-        "manual",
-        null,
-      ]
-    );
-
-    const productId = productInsert?.[0]?.id as string | undefined;
-    if (!productId) return res.status(500).json({ error: "Failed to create product" });
-
     // Create order
     const orderInsert = await ds.query(
-      `INSERT INTO "orders" ("userId", "productId", amount, status) VALUES ($1, $2, $3, $4) RETURNING id`,
-      [dbUser.id, productId, total, "pending"]
+      `INSERT INTO "orders" (
+         "userId",
+         "productId",
+         amount,
+         status,
+         "productTitle",
+         "productDescription",
+         "productDeliveryType",
+         "productTags"
+       )
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       RETURNING id`,
+      [dbUser.id, null, total, "pending", label, customPlanDescription, "manual", customPlanTags.join(",")]
     );
 
     const orderId = orderInsert?.[0]?.id as string | undefined;
@@ -104,16 +107,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const checkoutRes = await createCheckoutLink(payload);
 
     // Save payment record
-    const paymentInsert = await ds.query(
+    await ds.query(
       `INSERT INTO "payments" ("orderId", provider, "providerPaymentId", status, "rawPayload") VALUES ($1, $2, $3, $4, $5) RETURNING id`,
-      [orderId, "infinitepay", checkoutRes.id || checkoutRes.link || checkoutRes.slug || "", "pending", JSON.stringify(checkoutRes)],
+      [
+        orderId,
+        "infinitepay",
+        checkoutRes.id || checkoutRes.link || checkoutRes.slug || "",
+        "pending",
+        JSON.stringify({ request: payload, response: checkoutRes }),
+      ],
     );
 
     // Try to create a Discord ticket for the order
     try {
       const ticket = await createOrderTicketThread({
         orderId,
-        productTitle: `Plano Personalizado`,
+        productTitle: label,
         amount: total,
         mention: null,
         userEmail: dbUser.email || null,

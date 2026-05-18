@@ -5,6 +5,13 @@ import { Product } from "../../../../entities/Product";
 import { ensureDataSource } from "../../../../lib/db";
 import { isAdminRole } from "../../../../lib/admin";
 
+const normalizeTags = (tags: Product["tags"] | string | null | undefined) =>
+  Array.isArray(tags)
+    ? tags
+    : typeof tags === "string"
+      ? tags.split(",").map((tag) => tag.trim()).filter(Boolean)
+      : [];
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const session = await getServerSession(req, res, authOptions);
   const sessionUser = session?.user as { roles?: string[] } | undefined;
@@ -18,7 +25,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (req.method === "GET") {
     const products = await productRepository.find({ order: { createdAt: "DESC" } });
-    return res.status(200).json({ products });
+    return res.status(200).json({ products: products.filter((product) => !normalizeTags(product.tags).includes("custom:plan")) });
   }
 
   if (req.method === "POST") {

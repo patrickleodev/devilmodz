@@ -5,7 +5,6 @@ import { ensureDataSource } from "../../../lib/db";
 import { Order } from "../../../entities/Order";
 import { Product } from "../../../entities/Product";
 import { Payment } from "../../../entities/Payment";
-import { User } from "../../../entities/User";
 import { resolveDbUser } from "../../../lib/session";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -29,17 +28,43 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const [order] = (await ds.query(
-      `SELECT "id", "userId", "productId", "amount", "status", "createdAt" FROM "orders" WHERE "id" = $1`,
+      `SELECT
+         "id",
+         "userId",
+         "productId",
+         "productTitle",
+         "productDescription",
+         "productDeliveryType",
+         "productTags",
+         "amount",
+         "status",
+         "createdAt"
+       FROM "orders"
+       WHERE "id" = $1`,
       [id]
     )) as Array<Order>;
     
     if (!order) return res.status(404).json({ error: "Order not found" });
     if (order.userId !== dbUser.id) return res.status(403).json({ error: "Forbidden" });
 
-    const product = await productRepo.findOneBy({ id: order.productId });
+    const product = order.productId ? await productRepo.findOneBy({ id: order.productId }) : null;
+    const rawProductTags: unknown = order.productTags;
+    const snapshotTags =
+      Array.isArray(rawProductTags)
+        ? rawProductTags
+        : typeof rawProductTags === "string"
+          ? rawProductTags.split(",").map((tag) => tag.trim()).filter(Boolean)
+          : [];
+    const orderProduct = product || {
+      id: order.productId || null,
+      title: order.productTitle || null,
+      description: order.productDescription || null,
+      deliveryType: order.productDeliveryType || null,
+      tags: snapshotTags,
+    };
     const payment = await paymentRepo.findOne({ where: { orderId: order.id } });
 
-    return res.status(200).json({ order: { ...order, product, payment } });
+    return res.status(200).json({ order: { ...order, product: orderProduct, payment } });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unexpected error";
     return res.status(500).json({ error: message });

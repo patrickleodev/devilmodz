@@ -15,6 +15,24 @@ type CheckoutResponse = {
   slug?: string;
 };
 
+type CheckoutItem = {
+  productId: string | null;
+  title: string;
+  description: string | null;
+  deliveryType: string | null;
+  tags: string | null;
+  unitPrice: number;
+  quantity: number;
+  amount: number;
+};
+
+const serializeTags = (tags: Product["tags"] | string | null | undefined) =>
+  Array.isArray(tags)
+    ? tags.join(",")
+    : typeof tags === "string"
+      ? tags
+      : null;
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   res.setHeader('Cache-Control', 'no-store');
   if (req.method !== "POST") {
@@ -38,26 +56,74 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const items = await cartRepo.find({ where: { userId: dbUser.id } });
     if (!items || items.length === 0) return res.status(400).json({ error: "Cart is empty" });
 
-    // load product details and build MP items
+    // load item details and build checkout items
     const mpItems: Array<{ id: string; title: string; quantity: number; unit_price: number; currency_id: "BRL" }> = [];
     const createdOrders: string[] = [];
 
     for (const it of items) {
-      const product = await productRepo.findOneBy({ id: it.productId });
-      if (!product) continue;
-      const unitPrice = Number(product.price || 0);
-      const amount = unitPrice * it.quantity;
+      const product = it.productId ? await productRepo.findOneBy({ id: it.productId }) : null;
+      const checkoutItem: CheckoutItem | null = product
+        ? {
+            productId: product.id,
+            title: product.title,
+            description: product.description,
+            deliveryType: product.deliveryType,
+            tags: serializeTags(product.tags),
+            unitPrice: Number(product.price || 0),
+            quantity: it.quantity,
+            amount: Number(product.price || 0) * it.quantity,
+          }
+        : it.itemTitle && it.itemPrice
+          ? {
+              productId: null,
+              title: it.itemTitle,
+              description: it.itemDescription || null,
+              deliveryType: it.itemDeliveryType || null,
+              tags: serializeTags(it.itemTags),
+              unitPrice: Number(it.itemPrice || 0),
+              quantity: it.quantity,
+              amount: Number(it.itemPrice || 0) * it.quantity,
+            }
+          : null;
+
+      if (!checkoutItem) continue;
 
       // Use raw SQL insert to avoid TypeORM attempting to write columns that may not exist
       const insertRes = await ds.query(
-        `INSERT INTO "orders" ("userId", "productId", "amount", "status") VALUES ($1, $2, $3, $4) RETURNING "id"`,
-        [dbUser.id, product.id, amount, "pending"]
+        `INSERT INTO "orders" (
+           "userId",
+           "productId",
+           "amount",
+           "status",
+           "productTitle",
+           "productDescription",
+           "productDeliveryType",
+           "productTags"
+         )
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+         RETURNING "id"`,
+        [
+          dbUser.id,
+          checkoutItem.productId,
+          checkoutItem.amount,
+          "pending",
+          checkoutItem.title,
+          checkoutItem.description,
+          checkoutItem.deliveryType,
+          checkoutItem.tags,
+        ]
       );
 
       const savedId = insertRes?.[0]?.id as string | undefined;
       if (savedId) createdOrders.push(savedId);
 
-      mpItems.push({ id: product.id, title: product.title, quantity: it.quantity, unit_price: unitPrice, currency_id: "BRL" });
+      mpItems.push({
+        id: checkoutItem.productId || savedId || it.id,
+        title: checkoutItem.title,
+        quantity: checkoutItem.quantity,
+        unit_price: checkoutItem.unitPrice,
+        currency_id: "BRL",
+      });
     }
 
     if (mpItems.length === 0) return res.status(400).json({ error: "No valid products in cart" });

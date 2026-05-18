@@ -6,6 +6,13 @@ import { ensureDataSource, seedDefaultProducts } from "../../../../lib/db";
 import { isAdminRole } from "../../../../lib/admin";
 import { defaultProducts } from "../../../../lib/catalog";
 
+const normalizeTags = (tags: Product["tags"] | string | null | undefined) =>
+  Array.isArray(tags)
+    ? tags
+    : typeof tags === "string"
+      ? tags.split(",").map((tag) => tag.trim()).filter(Boolean)
+      : [];
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const session = await getServerSession(req, res, authOptions);
   const sessionUser = session?.user as { roles?: string[] } | undefined;
@@ -26,25 +33,33 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const seedPlanTags = new Set(defaultProducts.map((p) => `plan:${p.slug}`));
 
     const allProducts = await productRepository.find();
+    const referencedProducts = (await dataSource.query(
+      `SELECT "productId" FROM "orders"
+       UNION
+       SELECT "productId" FROM "cart_items"`
+    )) as Array<{ productId?: string | null }>;
+    const referencedProductIds = new Set(referencedProducts.map((row) => row.productId).filter(Boolean));
 
-    // Remove non-seed products
-    for (const prod of allProducts) {
-      const tags = prod.tags || [];
+    const productsToRemove = allProducts.filter((prod) => {
+      const tags = normalizeTags(prod.tags);
       const hasSeed = tags.some((t) => seedPlanTags.has(t));
-      if (!hasSeed) {
-        try {
-          await productRepository.remove(prod);
-        } catch (err) {
-          // ignore removal errors for safety
-        }
-      }
+      const isReferenced = referencedProductIds.has(prod.id);
+
+      return !hasSeed && !isReferenced;
+    });
+
+    if (productsToRemove.length > 0) {
+      await dataSource.query(
+        `DELETE FROM "products" WHERE "id" = ANY($1::uuid[])`,
+        [productsToRemove.map((product) => product.id)]
+      );
     }
 
     // Ensure the seed products exist and match seed data (force update)
     await seedDefaultProducts({ force: true });
 
-    return res.status(200).json({ ok: true });
-  } catch (err) {
+    return res.status(200).json({ ok: true, removed: productsToRemove.length });
+  } catch {
     return res.status(500).json({ error: "Falha ao restaurar produtos" });
   }
 }

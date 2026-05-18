@@ -8,7 +8,7 @@ type AccountOrder = {
   status: string;
   amount: number;
   createdAt: string;
-  productId: string;
+  productId?: string | null;
   discordThreadUrl?: string | null;
   product?: {
     id?: string;
@@ -345,7 +345,7 @@ export default function AccountPage() {
                         <h3 className="mb-3 text-sm font-semibold text-slate-300">{getLabel(key)}</h3>
                         <div className="w-full min-w-0 space-y-4">
                           {groups[key].map((order) => {
-                            const productTitle = order.product?.title || order.product?.name || order.productId;
+                            const productTitle = order.product?.title || order.product?.name || order.productId || "Plano personalizado";
                             const paymentStatus = order.payment?.status || "pending";
                             const isExpanded = expandedOrderIds.includes(order.id);
 

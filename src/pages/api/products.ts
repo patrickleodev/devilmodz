@@ -14,9 +14,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const dataSource = await ensureDataSource();
   const productRepository = dataSource.getRepository(Product);
   const products = await productRepository.find({ order: { price: "ASC" } });
-  const publicProducts = products.filter((product) => (product.tags || []).includes("public"));
+  const catalogProducts = products.filter((product) => !(product.tags || []).includes("custom:plan"));
+  const publicProducts = catalogProducts.filter((product) => (product.tags || []).includes("public"));
 
   return res.status(200).json({
-    products: (publicProducts.length > 0 ? publicProducts : products).map(productToStoreProduct),
+    products: (publicProducts.length > 0 ? publicProducts : catalogProducts).map(productToStoreProduct),
   });
 }

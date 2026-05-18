@@ -24,7 +24,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const loadCartItems = async () => {
     const items = await cartRepo.find({ where: { userId: dbUser.id } });
-    const productIds = [...new Set(items.map((item) => item.productId))];
+    const productIds = [
+      ...new Set(items.map((item) => item.productId).filter((id): id is string => Boolean(id))),
+    ];
     const products = productIds.length
       ? await productRepo.find({ where: { id: In(productIds) } })
       : [];
@@ -32,7 +34,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     return items.map((item) => ({
       ...item,
-      product: productsById.get(item.productId) || null,
+      product: item.productId
+        ? productsById.get(item.productId) || null
+        : {
+            id: null,
+            title: item.itemTitle,
+            description: item.itemDescription,
+            price: item.itemPrice,
+            deliveryType: item.itemDeliveryType,
+            tags: item.itemTags || [],
+          },
     }));
   };
 

@@ -52,6 +52,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       `"id"`,
       `"userId"`,
       `"productId"`,
+      `"productTitle"`,
+      `"productDescription"`,
+      `"productDeliveryType"`,
+      `"productTags"`,
       `"amount"`,
       `"status"`,
       `"createdAt"`,
@@ -89,7 +93,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           }
         }
 
-        const product = await productRepo.findOneBy({ id: o.productId });
+        const product = o.productId ? await productRepo.findOneBy({ id: o.productId }) : null;
+        const rawProductTags: unknown = o.productTags;
+        const snapshotTags =
+          Array.isArray(rawProductTags)
+            ? rawProductTags
+            : typeof rawProductTags === "string"
+              ? rawProductTags.split(",").map((tag) => tag.trim()).filter(Boolean)
+              : [];
+        const orderProduct = product || {
+          id: o.productId || null,
+          title: o.productTitle || null,
+          description: o.productDescription || null,
+          deliveryType: o.productDeliveryType || null,
+          tags: snapshotTags,
+        };
         const payments = await paymentRepo.find({ where: { orderId: o.id } });
         const payment =
           payments.find((entry) => ["completed", "paid", "approved"].includes(String(entry.status).toLowerCase())) ||
@@ -99,7 +117,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           ...o,
           discordThreadId,
           discordThreadUrl,
-          product,
+          product: orderProduct,
           payment,
         };
       })

@@ -96,7 +96,7 @@ const sendStatusReply = async (interaction: ChatInputCommandInteraction) => {
   await interaction.reply({
     content: [
       `Pedido: ${order.id}`,
-      `Produto: ${order.productId}`,
+      `Produto: ${order.productTitle || order.productId || "Plano personalizado"}`,
       `Status: ${order.status}`,
       `Valor: R$ ${order.amount}`,
     ].join("\n"),
@@ -135,7 +135,7 @@ const markDelivered = async (interaction: ChatInputCommandInteraction) => {
 
   const channelMessage = buildDeliveryMessage({
     orderId: order.id,
-    productTitle: order.productId,
+    productTitle: order.productTitle || order.productId || "Plano personalizado",
     deliveredBy: interaction.user.tag,
     note: note || undefined,
   });

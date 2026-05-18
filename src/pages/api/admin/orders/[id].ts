@@ -12,7 +12,7 @@ import { refundInfinitePayTransaction } from "../../../../lib/infinitepay";
 type TicketOrderDetails = {
   id: string;
   userId: string;
-  productId: string;
+  productId?: string | null;
   amount: number;
   status: string;
   discordThreadId?: string | null;
@@ -139,7 +139,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           u."email" AS "userEmail",
           u."discordId" AS "userDiscordId",
           u."name" AS "userName",
-          p."title" AS "productTitle"
+          COALESCE(p."title", o."productTitle") AS "productTitle"
         FROM "orders" o
         LEFT JOIN "users" u ON u."id" = o."userId"
         LEFT JOIN "products" p ON p."id" = o."productId"

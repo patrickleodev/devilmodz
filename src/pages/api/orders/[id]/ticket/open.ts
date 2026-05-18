@@ -51,6 +51,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       '"id"',
       '"userId"',
       '"productId"',
+      '"productTitle"',
       '"amount"',
       '"status"',
       '"createdAt"',
@@ -72,12 +73,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Fetch product details
     const productRepo = ds.getRepository(Product);
-    const product = await productRepo.findOneBy({ id: order.productId });
+    const product = order.productId ? await productRepo.findOneBy({ id: order.productId }) : null;
 
     // Create ticket thread
     const ticket = await createOrderTicketThread({
       orderId: order.id,
-      productTitle: product?.title || "Unknown Product",
+      productTitle: product?.title || order.productTitle || "Produto",
       amount: order.amount,
       mention: dbUser.discordId ? `<@${dbUser.discordId}>` : null,
       userEmail: dbUser.email || null,

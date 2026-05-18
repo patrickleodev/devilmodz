@@ -3,9 +3,21 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "../../../lib/auth";
 import { ensureDataSource } from "../../../lib/db";
 import { CartItem } from "../../../entities/CartItem";
-import { Product } from "../../../entities/Product";
 import { resolveDbUser } from "../../../lib/session";
-import { In } from "typeorm";
+
+const cartItemToResponse = (item: CartItem) => ({
+  ...item,
+  product: item.productId
+    ? null
+    : {
+        id: null,
+        title: item.itemTitle,
+        description: item.itemDescription,
+        price: item.itemPrice,
+        deliveryType: item.itemDeliveryType,
+        tags: item.itemTags || [],
+      },
+});
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
@@ -21,12 +33,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     carros?: number;
   };
 
-  // Validation
-  if (
-    typeof milhoes !== "number" ||
-    typeof trajes !== "number" ||
-    typeof carros !== "number"
-  ) {
+  if (typeof milhoes !== "number" || typeof trajes !== "number" || typeof carros !== "number") {
     return res.status(400).json({ error: "Invalid input: milhoes, trajes, and carros are required" });
   }
 
@@ -43,10 +50,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const steps = Math.max(0, milhoes / 30);
-  const PRICE_PER_STEP = 14.9;
-  const PRICE_PER_TRAJE = 0.95;
-  const PRICE_PER_CARRO = 2.9;
-  const price = steps * PRICE_PER_STEP + trajes * PRICE_PER_TRAJE + carros * PRICE_PER_CARRO;
+  const price = steps * 14.9 + trajes * 0.95 + carros * 2.9;
 
   if (price < 2) {
     return res.status(400).json({ error: "Total must be at least R$ 2.00" });
@@ -58,48 +62,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (!dbUser) return res.status(404).json({ error: "User not found" });
 
-    // Create temporary product with generic title for checkout, details in tags for admin
-    const productQuery = await dataSource.query(
-      `INSERT INTO "products" ("title", "description", "price", "deliveryType", "tags", "stock", "createdAt")
-       VALUES ($1, $2, $3, $4, $5, $6, NOW())
-       RETURNING "id"`,
-      [
-        "Plano Personalizado GTA",
-        "Produto personalizado com configurações customizadas",
-        price,
-        "automatic",
-        `custom:plan,money:${milhoes},clothes:${trajes},cars:${carros}`,
-        1,
-      ]
-    );
-
-    const productId = productQuery[0].id;
-
-    // Add to cart
     const cartRepo = dataSource.getRepository(CartItem);
+    const itemTags = ["custom:plan", "badge:Personalizado", `money:${milhoes}`, `clothes:${trajes}`, `cars:${carros}`];
     const cartItem = cartRepo.create({
       userId: dbUser.id,
-      productId,
+      productId: null,
+      itemTitle: "Plano Personalizado GTA",
+      itemDescription: "Plano personalizado com configuracoes customizadas",
+      itemPrice: price,
+      itemDeliveryType: "automatic",
+      itemTags,
       quantity: 1,
     });
 
     await cartRepo.save(cartItem);
 
     const cartItems = await cartRepo.find({ where: { userId: dbUser.id } });
-    const productIds = [...new Set(cartItems.map((item) => item.productId))];
-    const products = productIds.length
-      ? await dataSource.getRepository(Product).find({ where: { id: In(productIds) } })
-      : [];
-    const productsById = new Map(products.map((product) => [product.id, product]));
 
     return res.status(200).json({
       success: true,
-      productId,
       cartItemId: cartItem.id,
-      items: cartItems.map((item) => ({
-        ...item,
-        product: productsById.get(item.productId) || null,
-      })),
+      items: cartItems.map(cartItemToResponse),
       message: "Plano adicionado ao carrinho",
     });
   } catch (error) {

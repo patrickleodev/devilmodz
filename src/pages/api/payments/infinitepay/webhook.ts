@@ -9,7 +9,8 @@ import { User } from "../../../../entities/User";
 type OrderRow = {
   id: string;
   userId: string;
-  productId: string;
+  productId?: string | null;
+  productTitle?: string | null;
   amount: number;
   status: string;
   createdAt: Date;
@@ -64,7 +65,7 @@ const getOrderColumnPresence = async (dataSource: Awaited<ReturnType<typeof ensu
 
 const loadOrderById = async (dataSource: Awaited<ReturnType<typeof ensureDataSource>>, id: string) => {
   const presence = await getOrderColumnPresence(dataSource);
-  const selectColumns = [`"id"`, `"userId"`, `"productId"`, `"amount"`, `"status"`, `"createdAt"`];
+  const selectColumns = [`"id"`, `"userId"`, `"productId"`, `"productTitle"`, `"amount"`, `"status"`, `"createdAt"`];
 
   if (presence.hasDiscordThreadId) selectColumns.push(`"discordThreadId"`);
   if (presence.hasDiscordThreadUrl) selectColumns.push(`"discordThreadUrl"`);
@@ -237,7 +238,7 @@ const findOrderForWebhook = async (
 
       for (const amt of amountCandidates) {
         const candidates = (await dataSource.query(
-          `SELECT "id", "userId", "productId", "amount", "status", "createdAt"
+          `SELECT "id", "userId", "productId", "productTitle", "amount", "status", "createdAt"
            FROM "orders"
            WHERE "userId" = $1 AND ABS("amount" - $2::numeric) < 0.01 AND "status" = 'pending'
            ORDER BY "createdAt" DESC
@@ -261,7 +262,7 @@ const findOrderForWebhook = async (
 
     for (const amt of amountCandidates) {
       const candidates = (await dataSource.query(
-        `SELECT "id", "userId", "productId", "amount", "status", "createdAt"
+        `SELECT "id", "userId", "productId", "productTitle", "amount", "status", "createdAt"
          FROM "orders"
          WHERE ABS("amount" - $1::numeric) < 0.01 AND "status" = 'pending'
          ORDER BY "createdAt" DESC`,
@@ -445,14 +446,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         try {
           console.log("[InfinitePay Webhook] Iniciando criação de ticket Discord");
           const [product, dbUser] = await Promise.all([
-            productRepository.findOneBy({ id: order.productId }),
+            order.productId ? productRepository.findOneBy({ id: order.productId }) : Promise.resolve(null),
             userRepository.findOneBy({ id: order.userId }),
           ]);
 
           console.log("[InfinitePay Webhook] Product found:", product?.title, "User found:", dbUser?.email);
+          const ticketProductTitle = product?.title || order.productTitle || "Produto";
           console.log("[InfinitePay Webhook] Calling createOrderTicketThread with:", {
             orderId: order.id,
-            productTitle: product?.title || "Unknown Product",
+            productTitle: ticketProductTitle,
             amount: order.amount,
             mention: dbUser?.discordId ? `<@${dbUser.discordId}>` : null,
             userEmail: dbUser?.email || null,
@@ -461,7 +463,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
           const ticket = await createOrderTicketThread({
             orderId: order.id,
-            productTitle: product?.title || "Unknown Product",
+            productTitle: ticketProductTitle,
             amount: order.amount,
             mention: dbUser?.discordId ? `<@${dbUser.discordId}>` : null,
             userEmail: dbUser?.email || null,
@@ -508,7 +510,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
         try {
           const [siblingOrder] = (await dataSource.query(
-            `SELECT "id", "userId", "productId", "amount", "status", "createdAt", "discordThreadId", "discordThreadUrl"
+            `SELECT "id", "userId", "productId", "productTitle", "amount", "status", "createdAt", "discordThreadId", "discordThreadUrl"
              FROM "orders"
              WHERE "id" = $1`,
             [targetOrderId]
@@ -542,9 +544,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           siblingPayment.confirmedAt = siblingPayment.confirmedAt || new Date();
 
           const [siblingProduct, siblingUser] = await Promise.all([
-            productRepository.findOneBy({ id: siblingOrder.productId }),
+            siblingOrder.productId ? productRepository.findOneBy({ id: siblingOrder.productId }) : Promise.resolve(null),
             userRepository.findOneBy({ id: siblingOrder.userId }),
           ]);
+          const siblingProductTitle = siblingProduct?.title || siblingOrder.productTitle || "Produto";
 
           let siblingTicket: { threadId: string; threadUrl: string | null } | null =
             siblingOrder.discordThreadId && siblingOrder.discordThreadUrl
@@ -554,7 +557,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           if (!siblingTicket) {
             siblingTicket = await createOrderTicketThread({
               orderId: siblingOrder.id,
-              productTitle: siblingProduct?.title || "Unknown Product",
+              productTitle: siblingProductTitle,
               amount: siblingOrder.amount,
               mention: siblingUser?.discordId ? `<@${siblingUser.discordId}>` : null,
               userEmail: siblingUser?.email || null,
