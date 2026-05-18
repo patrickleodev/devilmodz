@@ -550,14 +550,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if ((newStatus === "paid" || newStatus === "completed") && (checkoutId || transactionId)) {
       const providerPaymentId = checkoutId || transactionId;
       await dataSource.query(
-        `UPDATE "payment" SET "status" = $1, "confirmedAt" = COALESCE("confirmedAt", NOW())
+        `UPDATE "payments" SET "status" = $1, "confirmedAt" = COALESCE("confirmedAt", NOW())
          WHERE "provider" = 'infinitepay' AND "providerPaymentId" = $2`,
         [newStatus, providerPaymentId]
       );
       
       // Also update all related orders to completed status
       const allPayments = await dataSource.query(
-        `SELECT "orderId" FROM "payment" WHERE "provider" = 'infinitepay' AND "providerPaymentId" = $1`,
+        `SELECT "orderId" FROM "payments" WHERE "provider" = 'infinitepay' AND "providerPaymentId" = $1`,
         [providerPaymentId]
       );
       
