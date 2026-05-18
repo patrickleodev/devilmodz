@@ -22,6 +22,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const milhoesValue = Number(milhoes);
   const trajesValue = Number(trajes || 0);
   const carrosValue = Number(carros || 0);
+  const nivelPersonalizado = req.body?.nivelPersonalizado === true;
 
   if (!Number.isFinite(milhoesValue) || !Number.isFinite(trajesValue)) {
     return res.status(400).json({ error: "Quantidade de milhões inválida" });
@@ -34,6 +35,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const PRICE_PER_STEP = 14.9;
   const PRICE_PER_TRAJE = 0.95;
   const PRICE_PER_CARRO = 2.9;
+  const PRICE_NIVEL_PERSONALIZADO = 6;
   if (trajesValue < 0 || trajesValue > 100) {
     return res.status(400).json({ error: "Trajes inválidos (0-100)" });
   }
@@ -43,7 +45,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const milhoesSubtotal = (milhoesValue / STEP_MILHOES) * PRICE_PER_STEP;
   const trajesSubtotal = trajesValue * PRICE_PER_TRAJE;
   const carrosSubtotal = carrosValue * PRICE_PER_CARRO;
-  const total = milhoesSubtotal + trajesSubtotal + carrosSubtotal;
+  const total = milhoesSubtotal + trajesSubtotal + carrosSubtotal + (nivelPersonalizado ? PRICE_NIVEL_PERSONALIZADO : 0);
   const label = `Plano Personalizado`;
   const customPlanDescription = `Plano customizado gerado pelo usuario.`;
   const customPlanTags = [
@@ -52,6 +54,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     `money:${milhoesValue}`,
     `clothes:${trajesValue}`,
     `cars:${carrosValue}`,
+    ...(nivelPersonalizado ? ["level:custom"] : []),
   ];
 
   // Valor mínimo para criar checkout (R$2.00)

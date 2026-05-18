@@ -31,7 +31,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     milhoes?: number;
     trajes?: number;
     carros?: number;
+    nivelPersonalizado?: boolean;
   };
+  const nivelPersonalizado = req.body?.nivelPersonalizado === true;
 
   if (typeof milhoes !== "number" || typeof trajes !== "number" || typeof carros !== "number") {
     return res.status(400).json({ error: "Invalid input: milhoes, trajes, and carros are required" });
@@ -50,7 +52,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const steps = Math.max(0, milhoes / 30);
-  const price = steps * 14.9 + trajes * 0.95 + carros * 2.9;
+  const price = steps * 14.9 + trajes * 0.95 + carros * 2.9 + (nivelPersonalizado ? 6 : 0);
 
   if (price < 2) {
     return res.status(400).json({ error: "Total must be at least R$ 2.00" });
@@ -63,7 +65,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!dbUser) return res.status(404).json({ error: "User not found" });
 
     const cartRepo = dataSource.getRepository(CartItem);
-    const itemTags = ["custom:plan", "badge:Personalizado", `money:${milhoes}`, `clothes:${trajes}`, `cars:${carros}`];
+    const itemTags = [
+      "custom:plan",
+      "badge:Personalizado",
+      `money:${milhoes}`,
+      `clothes:${trajes}`,
+      `cars:${carros}`,
+      ...(nivelPersonalizado ? ["level:custom"] : []),
+    ];
     const cartItem = cartRepo.create({
       userId: dbUser.id,
       productId: null,

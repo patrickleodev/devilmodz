@@ -26,7 +26,23 @@ export default function Header() {
   const [cartCount, setCartCount] = useState(0);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement | null>(null);
+  const headerRef = useRef<HTMLElement | null>(null);
   const cartNotifyTimeoutRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const setHeaderHeight = () => {
+      const h = headerRef.current?.offsetHeight ?? 64;
+      try {
+        document.documentElement.style.setProperty('--site-header-height', `${h}px`);
+      } catch {
+        /* ignore */
+      }
+    };
+
+    setHeaderHeight();
+    window.addEventListener('resize', setHeaderHeight);
+    return () => window.removeEventListener('resize', setHeaderHeight);
+  }, []);
 
   useEffect(() => {
     const handlePointerDown = (event: MouseEvent) => {
@@ -112,7 +128,7 @@ export default function Header() {
 
   return (
     <>
-      <header className="fixed left-0 right-0 top-0 z-50 w-full border-b border-white/10 bg-slate-950/95">
+      <header ref={headerRef} className="fixed left-0 right-0 top-0 z-50 w-full border-b border-white/10 bg-slate-950/95">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-2 sm:px-6 lg:px-10">
           {/* Logo */}
           <Link

@@ -647,11 +647,15 @@ export default function AdminDashboard() {
                               const moneyVal = tagsArray.find((t) => t.startsWith("money:"))?.split(":")[1] || "0";
                               const clothes = tagsArray.find((t) => t.startsWith("clothes:"))?.split(":")[1] || "0";
                               const cars = tagsArray.find((t) => t.startsWith("cars:"))?.split(":")[1] || "0";
+                              const hasCustomLevel = tagsArray.includes("level:custom");
                               return (
                                 <>
                                   <span className="rounded-md bg-emerald-500/15 px-2 py-1">💰 Dinheiro: {moneyVal}M</span>
                                   <span className="rounded-md bg-cyan-500/15 px-2 py-1">👕 Trajes: {clothes}</span>
                                   <span className="rounded-md bg-pink-500/15 px-2 py-1">🚗 Carros: {cars}</span>
+                                  {hasCustomLevel ? (
+                                    <span className="rounded-md bg-amber-500/15 px-2 py-1">Nivel personalizado</span>
+                                  ) : null}
                                 </>
                               );
                             })()}
@@ -976,12 +980,13 @@ export default function AdminDashboard() {
                   const isCustomPlan = normalizeTags(product.tags).includes("custom:plan");
                   
                   // Extract custom plan details from tags
-                  const customPlanDetails = { money: 0, clothes: 0, cars: 0 };
+                  const customPlanDetails = { money: 0, clothes: 0, cars: 0, customLevel: false };
                   if (isCustomPlan) {
                     normalizeTags(product.tags).forEach((tag) => {
                       if (tag.startsWith("money:")) customPlanDetails.money = parseInt(tag.split(":")[1], 10);
                       if (tag.startsWith("clothes:")) customPlanDetails.clothes = parseInt(tag.split(":")[1], 10);
                       if (tag.startsWith("cars:")) customPlanDetails.cars = parseInt(tag.split(":")[1], 10);
+                      if (tag === "level:custom") customPlanDetails.customLevel = true;
                     });
                   }
                   
@@ -1010,6 +1015,9 @@ export default function AdminDashboard() {
                             <span className="rounded-md bg-emerald-500/15 px-2 py-1">💰 Dinheiro: {customPlanDetails.money}M</span>
                             <span className="rounded-md bg-cyan-500/15 px-2 py-1">👕 Trajes: {customPlanDetails.clothes}</span>
                             <span className="rounded-md bg-pink-500/15 px-2 py-1">🚗 Carros: {customPlanDetails.cars}</span>
+                            {customPlanDetails.customLevel ? (
+                              <span className="rounded-md bg-amber-500/15 px-2 py-1">Nivel personalizado</span>
+                            ) : null}
                           </div>
                         )}
                       </div>
