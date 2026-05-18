@@ -155,30 +155,50 @@ const getCheckoutIdFromRequest = (req: NextApiRequest) => {
   return body?.order_nsu || body?.checkoutId || body?.checkout_id || null;
 };
 
+const collectOrderIdsFromPayload = (payload: any) => {
+  const rawValues: string[] = [];
+
+  const pushValue = (value: unknown) => {
+    if (Array.isArray(value)) {
+      for (const entry of value) {
+        pushValue(entry);
+      }
+      return;
+    }
+
+    if (typeof value === "string") {
+      rawValues.push(...value.split(","));
+      return;
+    }
+
+    if (value !== null && value !== undefined) {
+      rawValues.push(String(value));
+    }
+  };
+
+  pushValue(payload?.metadata?.orderIds);
+  pushValue(payload?.metadata?.orderId);
+  pushValue(payload?.metadata?.order_nsu);
+  pushValue(payload?.order_nsu);
+  pushValue(payload?.external_reference);
+  pushValue(payload?.reference);
+  pushValue(payload?.data?.order_nsu);
+
+  return Array.from(new Set(rawValues.map((value) => value.trim()).filter(Boolean)));
+};
+
 const findOrderForWebhook = async (
   dataSource: Awaited<ReturnType<typeof ensureDataSource>>,
   payload: any,
   transactionId?: string | null
 ) => {
-  const rawOrderReference = String(
-    payload?.metadata?.orderId ||
-      payload?.metadata?.order_nsu ||
-      payload?.order_nsu ||
-      payload?.external_reference ||
-      payload?.reference ||
-      payload?.data?.order_nsu ||
-      ""
-  );
+  const rawOrderIds = collectOrderIdsFromPayload(payload);
+  const orderIdCandidates = rawOrderIds.filter((value) => UUID_PATTERN.test(value));
 
-  const orderIdCandidates = rawOrderReference
-    .split(",")
-    .map((value) => value.trim())
-    .filter((value) => value.length > 0 && UUID_PATTERN.test(value));
-
-  if (rawOrderReference && orderIdCandidates.length > 0) {
+  if (rawOrderIds.length > 0 && orderIdCandidates.length > 0) {
     if (orderIdCandidates.length > 1) {
       console.warn("[InfinitePay Webhook] orderId had multiple UUID candidates; using the first one", {
-        rawOrderReference,
+        rawOrderIds,
         orderIdCandidates,
       });
     }
@@ -191,8 +211,8 @@ const findOrderForWebhook = async (
     }
   }
 
-  if (rawOrderReference && !orderIdCandidates.length) {
-    console.warn("[InfinitePay Webhook] Ignoring non-UUID order reference from payload", { rawOrderReference });
+  if (rawOrderIds.length > 0 && !orderIdCandidates.length) {
+    console.warn("[InfinitePay Webhook] Ignoring non-UUID order references from payload", { rawOrderIds });
   }
 
   const payerEmail = payload?.metadata?.payerEmail || payload?.metadata?.email || payload?.customer?.email || null;
@@ -350,6 +370,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     console.log("[InfinitePay Webhook] Mapped payment status:", payment.status, "->", newStatus);
 
+    const payloadOrderIds = collectOrderIdsFromPayload(transaction).filter((value) => UUID_PATTERN.test(value));
+    const targetOrderIds = Array.from(new Set([order.id, ...payloadOrderIds]));
+
     const existingPayment =
       (await paymentRepository.findOne({
         where: {
@@ -416,6 +439,80 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             console.log("[InfinitePay Webhook] Updated order to completed despite ticket error");
           } catch (updateErr) {
             console.error("[InfinitePay Webhook] Failed to update order status:", updateErr instanceof Error ? updateErr.message : String(updateErr));
+          }
+        }
+
+        for (const targetOrderId of targetOrderIds) {
+          if (targetOrderId === order.id) {
+            continue;
+          }
+
+          try {
+            const [siblingOrder] = (await dataSource.query(
+              `SELECT "id", "userId", "productId", "amount", "status", "createdAt", "discordThreadId", "discordThreadUrl"
+               FROM "orders"
+               WHERE "id" = $1`,
+              [targetOrderId]
+            )) as Array<OrderRow>;
+
+            if (!siblingOrder) {
+              console.warn("[InfinitePay Webhook] Skipping missing sibling order:", targetOrderId);
+              continue;
+            }
+
+            const siblingPayment =
+              (await paymentRepository.findOne({
+                where: {
+                  orderId: siblingOrder.id,
+                  provider: "infinitepay",
+                },
+              })) ||
+              paymentRepository.create({
+                orderId: siblingOrder.id,
+                provider: "infinitepay",
+                providerPaymentId: transactionId ?? checkoutId ?? undefined,
+                status: newStatus,
+                rawPayload: transaction,
+              } as Partial<Payment>);
+
+            siblingPayment.provider = "infinitepay";
+            siblingPayment.orderId = siblingOrder.id;
+            siblingPayment.providerPaymentId = transactionId || checkoutId || siblingPayment.providerPaymentId;
+            siblingPayment.status = newStatus;
+            siblingPayment.rawPayload = { ...siblingPayment.rawPayload, ...req.body, ...transaction };
+            siblingPayment.confirmedAt = siblingPayment.confirmedAt || new Date();
+
+            const [siblingProduct, siblingUser] = await Promise.all([
+              productRepository.findOneBy({ id: siblingOrder.productId }),
+              userRepository.findOneBy({ id: siblingOrder.userId }),
+            ]);
+
+            let siblingTicket =
+              siblingOrder.discordThreadId && siblingOrder.discordThreadUrl
+                ? { threadId: siblingOrder.discordThreadId, threadUrl: siblingOrder.discordThreadUrl }
+                : null;
+
+            if (!siblingTicket) {
+              siblingTicket = await createOrderTicketThread({
+                orderId: siblingOrder.id,
+                productTitle: siblingProduct?.title || "Unknown Product",
+                amount: siblingOrder.amount,
+                mention: siblingUser?.discordId ? `<@${siblingUser.discordId}>` : null,
+                userEmail: siblingUser?.email || null,
+                userName: siblingUser?.name || null,
+                providerLabel: "InfinitePay",
+              });
+            }
+
+            await paymentRepository.save(siblingPayment);
+            await updateOrderStatus(dataSource, siblingOrder.id, "completed", siblingTicket || undefined);
+            console.log("[InfinitePay Webhook] Processed sibling order from the same checkout:", siblingOrder.id);
+          } catch (siblingErr) {
+            console.error(
+              "[InfinitePay Webhook] Failed processing sibling order:",
+              targetOrderId,
+              siblingErr instanceof Error ? siblingErr.message : String(siblingErr)
+            );
           }
         }
       } else {
