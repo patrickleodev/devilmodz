@@ -1,0 +1,13 @@
+{
+  "name": "toggle-demo",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "record": "node record.js"
+  },
+  "dependencies": {
+    "gifencoder": "^2.0.1",
+    "pngjs": "^6.0.0",
+    "puppeteer": "^21.3.0"
+  }
+}

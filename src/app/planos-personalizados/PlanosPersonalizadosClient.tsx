@@ -222,15 +222,24 @@ export default function PlanosPersonalizadosClient() {
                             className="absolute left-1 top-1/2 flex h-5 w-5 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-black/5 transition-transform duration-200 ease-out"
                             style={{ transform: extra.checked ? "translate(28px, -50%)" : "translate(0, -50%)" }}
                           >
-                            <span
-                              className={`pointer-events-none absolute inset-0 flex items-center justify-center text-[10px] font-black leading-none text-slate-950 transition-all duration-200 ease-out ${extra.checked ? "scale-0 opacity-0" : "scale-100 opacity-100"}`}
-                            >
-                              x
-                            </span>
-                            <span
-                              className={`pointer-events-none absolute inset-0 flex items-center justify-center text-[10px] font-black leading-none text-slate-950 transition-all duration-200 ease-out ${extra.checked ? "scale-100 opacity-100" : "scale-0 opacity-0"}`}
-                            >
-                              ✓
+                            <span className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                              <span className={`absolute inset-0 flex items-center justify-center transition-all duration-150 ${extra.checked ? 'opacity-0 scale-75' : 'opacity-100 scale-100'}`}>
+                                <span className="absolute h-[2px] w-3.5 rounded-full bg-slate-700 rotate-45" />
+                                <span className="absolute h-[2px] w-3.5 rounded-full bg-slate-700 -rotate-45" />
+                              </span>
+
+                              <svg
+                                className={`w-5 h-5 text-cyan-400 transition-all duration-180 transform ${extra.checked ? 'opacity-100 scale-100' : 'opacity-0 scale-75'}`}
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth={3}
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                aria-hidden
+                              >
+                                <path d="M6 12l4 4 8-8" />
+                              </svg>
                             </span>
                           </span>
                         </span>

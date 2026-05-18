@@ -1,0 +1,67 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Toggle Demo</title>
+  <style>
+    :root{--bg:#071018;--track:#213047;--track-checked:#06cddd;--knob:#ffffff;--accent:#0ea5a0}
+    html,body{height:100%;margin:0}
+    body{display:flex;align-items:center;justify-content:center;background:linear-gradient(180deg,#071018,#0b1720);font-family:system-ui}
+    .wrap{width:220px;height:120px;display:flex;align-items:center;justify-content:center}
+
+    .toggle{width:96px;height:44px;border-radius:9999px;background:var(--track);padding:6px;position:relative;display:inline-block;box-shadow:0 6px 20px rgba(2,6,23,0.6)}
+    .toggle.checked{background:var(--track-checked)}
+    .knob{position:absolute;left:6px;top:50%;transform:translate(0,-50%);width:32px;height:32px;border-radius:9999px;background:var(--knob);display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,0.35);transition:transform 220ms cubic-bezier(.2,.9,.3,1), left 220ms cubic-bezier(.2,.9,.3,1)}
+    .toggle.checked .knob{left:58px}
+
+    .symbol{position:relative;width:14px;height:14px}
+    .stroke{position:absolute;left:50%;top:50%;height:2px;background:var(--stroke,#0f1724);border-radius:2px;transform-origin:center}
+    .x .s1{width:14px;transform:translate(-50%,-50%) rotate(45deg)}
+    .x .s2{width:14px;transform:translate(-50%,-50%) rotate(-45deg)}
+    .check .c1{width:7px;transform-origin:left center;transform:translate(-50%,-50%) rotate(45deg)}
+    .check .c2{width:12px;transform-origin:left center;transform:translate(-50%,-50%) rotate(-45deg)}
+
+    /* show/hide */
+    .x{opacity:1;transition:opacity 180ms ease}
+    .toggle.checked .x{opacity:0}
+    .check{opacity:0;transition:opacity 180ms ease}
+    .toggle.checked .check{opacity:1}
+
+    /* color variables */
+    .stroke{background:var(--stroke,#0f1724)}
+    .toggle.checked .stroke{background:#0b3740}
+
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div id="toggle" class="toggle" role="switch" aria-checked="false">
+      <div class="knob">
+        <div class="symbol x" aria-hidden="true">
+          <div class="stroke s1"></div>
+          <div class="stroke s2"></div>
+        </div>
+        <div class="symbol check" aria-hidden="true">
+          <div class="stroke c1"></div>
+          <div class="stroke c2"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const toggle = document.getElementById('toggle');
+    toggle.addEventListener('click', () => {
+      const checked = toggle.classList.toggle('checked');
+      toggle.setAttribute('aria-checked', String(checked));
+    });
+
+    // autoplay demo: click after load then toggle back and forth
+    setTimeout(()=>{
+      toggle.click();
+      setTimeout(()=>toggle.click(),800);
+    },400);
+  </script>
+</body>
+</html>
