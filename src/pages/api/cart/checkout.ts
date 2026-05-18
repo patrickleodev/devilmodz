@@ -40,6 +40,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: "Method not allowed" });
   }
 
+  // parse optional login details sent from the cart UI
+  const body = req.body as { loginDetails?: { account?: string; password?: string; platform?: string } } | undefined;
+  const loginDetails = body?.loginDetails;
+
   const session = await getServerSession(req, res, authOptions);
   const sessionUser = session?.user as { id?: string } | undefined;
   if (!sessionUser?.id) return res.status(401).json({ error: "Unauthorized" });
@@ -148,6 +152,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       redirect_url: `${getAppBaseUrl()}/`,
     };
 
+    // If login details were provided, add a minimal, non-sensitive summary to metadata for quick reference.
+    // WARNING: full credentials (passwords) should be handled carefully. Below we add a masked summary
+    // to the metadata and attach the raw login details to the payment rawPayload for backend operators.
+    // Consider encrypting or avoiding storing plaintext passwords in production.
+    if (loginDetails) {
+      payload.metadata = { ...(payload.metadata as object), loginSummary: { account: loginDetails.account, platform: loginDetails.platform } };
+    }
+
     const checkoutRes = (await createCheckoutLink(payload)) as CheckoutResponse;
     const paymentUrl = checkoutRes.url || checkoutRes.link || (checkoutRes.slug ? `https://checkout.infinitepay.io/${handle}/${checkoutRes.slug}` : undefined);
     const providerPaymentId = checkoutRes.id || paymentUrl || checkoutRes.link || checkoutRes.slug || "";
@@ -162,13 +174,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Create payment records for ALL orders in the cart
     for (const orderId of createdOrders) {
+      // attach loginDetails to the rawPayload for this payment (if provided)
+      const rawPayload: Record<string, unknown> = { request: payload, response: checkoutRes, paymentUrl };
+      if (loginDetails) rawPayload.loginDetails = loginDetails;
+
       await paymentRepo.save(
         paymentRepo.create({
           orderId,
           provider: "infinitepay",
           providerPaymentId,
           status: "pending",
-          rawPayload: { request: payload, response: checkoutRes, paymentUrl },
+          rawPayload,
         })
       );
     }

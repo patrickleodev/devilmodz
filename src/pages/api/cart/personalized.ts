@@ -32,8 +32,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     trajes?: number;
     carros?: number;
     nivelPersonalizado?: boolean;
+    unlockAll?: boolean;
+    allProperties?: boolean;
+    kdEditado?: boolean;
+    corridinhaMod?: boolean;
+    dataCriacao?: boolean;
+    pesquisasBunker?: boolean;
   };
   const nivelPersonalizado = req.body?.nivelPersonalizado === true;
+  const unlockAll = req.body?.unlockAll === true;
+  const allProperties = req.body?.allProperties === true;
+  const kdEditado = req.body?.kdEditado === true;
+  const corridinhaMod = req.body?.corridinhaMod === true;
+  const dataCriacao = req.body?.dataCriacao === true;
+  const pesquisasBunker = req.body?.pesquisasBunker === true;
 
   if (typeof milhoes !== "number" || typeof trajes !== "number" || typeof carros !== "number") {
     return res.status(400).json({ error: "Invalid input: milhoes, trajes, and carros are required" });
@@ -52,15 +64,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const steps = Math.max(0, milhoes / 30);
-  const price = steps * 14.9 + trajes * 0.95 + carros * 2.9 + (nivelPersonalizado ? 6 : 0);
+  const price =
+    steps * 14.9 +
+    trajes * 0.95 +
+    carros * 2.9 +
+    (nivelPersonalizado ? 6 : 0) +
+    (unlockAll ? 17.9 : 0) +
+    (allProperties ? 19.9 : 0) +
+    (kdEditado ? 1.5 : 0) +
+    (corridinhaMod ? 3 : 0) +
+    (dataCriacao ? 4 : 0) +
+    (pesquisasBunker ? 5 : 0);
 
   if (price < 2) {
     return res.status(400).json({ error: "Total must be at least R$ 2.00" });
   }
 
   try {
-    const dataSource = await ensureDataSource();
-    const dbUser = await resolveDbUser(sessionUser);
+    const dataSource = await ensureDataSource({ skipMaintenance: true });
+    const dbUser = await resolveDbUser(sessionUser, dataSource);
 
     if (!dbUser) return res.status(404).json({ error: "User not found" });
 
@@ -72,11 +94,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       `clothes:${trajes}`,
       `cars:${carros}`,
       ...(nivelPersonalizado ? ["level:custom"] : []),
+      ...(unlockAll ? ["unlock:complete"] : []),
+      ...(allProperties ? ["properties:all"] : []),
+      ...(kdEditado ? ["kd:edited"] : []),
+      ...(corridinhaMod ? ["drive:mod"] : []),
+      ...(dataCriacao ? ["creation:date"] : []),
+      ...(pesquisasBunker ? ["bunker:searches"] : []),
     ];
     const cartItem = cartRepo.create({
       userId: dbUser.id,
       productId: null,
-      itemTitle: "Plano Personalizado GTA",
+      itemTitle: "Plano Personalizado",
       itemDescription: "Plano personalizado com configuracoes customizadas",
       itemPrice: price,
       itemDeliveryType: "automatic",

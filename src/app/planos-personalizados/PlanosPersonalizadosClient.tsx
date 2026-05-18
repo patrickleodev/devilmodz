@@ -1,8 +1,12 @@
 "use client";
 
 import React, { useState } from "react";
+import Link from "next/link";
+import { FiList } from "react-icons/fi";
+import { signIn, useSession } from "next-auth/react";
 
 export default function PlanosPersonalizadosClient() {
+  const { data: session } = useSession();
   const [milhoes, setMilhoes] = useState(0);
   const [trajes, setTrajes] = useState(0);
   const [carros, setCarros] = useState(0);
@@ -104,12 +108,51 @@ export default function PlanosPersonalizadosClient() {
       setError(`Preço mínimo para gerar checkout: ${money.format(2)}`);
       return;
     }
+
+    if (!session?.user) {
+      await signIn("discord", { callbackUrl: "/planos-personalizados" });
+      return;
+    }
+
     try {
       setLoading(true);
-      // Simulate adding to cart / checkout flow. Replace with real API call if desired.
-      await new Promise((res) => setTimeout(res, 700));
+
+      const response = await fetch("/api/cart/personalized", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          milhoes,
+          trajes,
+          carros,
+          nivelPersonalizado,
+          unlockAll,
+          allProperties,
+          kdEditado,
+          corridinhaMod,
+          dataCriacao,
+          pesquisasBunker,
+        }),
+      });
+
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.error || "Falha ao adicionar ao carrinho");
+      }
+
+      try {
+        const count = (payload.items || []).reduce(
+          (sum: number, item: { quantity?: number }) => sum + Number(item.quantity || 1),
+          0,
+        );
+        window.dispatchEvent(new CustomEvent("cart_count_changed", { detail: { count } }));
+        window.dispatchEvent(new Event("cart_notify"));
+      } catch {
+        /* ignore */
+      }
+
+      window.dispatchEvent(new Event("open_cart"));
     } catch (err) {
-      setError("Erro ao adicionar ao carrinho.");
+      setError(err instanceof Error ? err.message : "Erro ao adicionar ao carrinho.");
     } finally {
       setLoading(false);
     }
@@ -132,6 +175,15 @@ export default function PlanosPersonalizadosClient() {
             <p className="mt-2 text-sm text-slate-300 sm:text-base">
               Arraste o controle para definir o valor em milhões (dinheiro) e siga para o checkout seguro.
             </p>
+            <div className="mt-4">
+              <Link
+                href="/planos"
+                className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-cyan-400 to-emerald-400 px-4 py-2 text-sm font-semibold text-slate-950 shadow-md transition hover:from-cyan-300 hover:to-emerald-300"
+              >
+                <FiList className="h-4 w-4 text-slate-950" />
+                <span className="text-slate-950 whitespace-nowrap">Ver Planos Prontos</span>
+              </Link>
+            </div>
           </div>
 
           <form onSubmit={handleSubmit} className="flex flex-col gap-6 overflow-visible lg:flex-row lg:items-start lg:gap-6">

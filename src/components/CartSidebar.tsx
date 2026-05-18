@@ -2,6 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useSession, signIn } from "next-auth/react";
+import { FiTrash2 } from "react-icons/fi";
+import { FaSteam, FaXbox, FaGamepad } from "react-icons/fa";
+import { SiRockstargames } from "react-icons/si";
 
 type CartItem = any;
 
@@ -18,6 +21,16 @@ export default function CartSidebar({ open, onClose }: { open: boolean; onClose:
   const [items, setItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loginFormVisible, setLoginFormVisible] = useState(false);
+  const [loginDetails, setLoginDetails] = useState({
+    platform: "PC",
+    version: "enhanced",
+    store: "steam",
+    storeAccount: "",
+    storePassword: "",
+    rockstarEmail: "",
+    rockstarPassword: "",
+  });
   const money = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
   const total = items.reduce(
     (sum, item) => sum + Number(item.product?.price || 0) * Number(item.quantity || 1),
@@ -57,11 +70,12 @@ export default function CartSidebar({ open, onClose }: { open: boolean; onClose:
     fetchCart();
   };
 
-  const handleCheckout = async () => {
+  const handleCheckout = async (details?: { account?: string; password?: string; platform?: string }) => {
     if (!session) return signIn("discord");
     setLoading(true);
     try {
-      const res = await fetch("/api/cart/checkout", { method: "POST" });
+      const body = details ? { loginDetails: details } : undefined;
+      const res = await fetch("/api/cart/checkout", { method: "POST", headers: { "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
       const payload = await res.json();
       if (!res.ok) throw new Error(payload.error || "Checkout failed");
       const url = payload.paymentUrl || payload.initPoint || payload.sandboxInitPoint;
@@ -120,7 +134,7 @@ export default function CartSidebar({ open, onClose }: { open: boolean; onClose:
                     aria-label="Remover item do carrinho"
                     className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-white/5 text-rose-500 transition hover:bg-rose-500/10 hover:text-rose-600"
                   >
-                    ✕
+                    <FiTrash2 className="h-4 w-4" aria-hidden="true" />
                   </button>
                 </div>
               ))}
@@ -134,11 +148,144 @@ export default function CartSidebar({ open, onClose }: { open: boolean; onClose:
               <span className="text-sm font-medium text-slate-300">Total</span>
               <span className="text-lg font-semibold text-white">{money.format(total)}</span>
             </div>
-            <button onClick={handleCheckout} className="w-full cursor-pointer rounded-2xl bg-emerald-400 px-4 py-3 font-semibold text-slate-950">Finalizar compra</button>
-            <button onClick={handleClearCart} className="w-full cursor-pointer bg-transparent px-0 py-0 text-center text-sm font-semibold text-slate-300 transition hover:text-white">Limpar carrinho</button>
+
+            {/* Login details form shown before checkout when required */}
+            <>
+              <button onClick={() => setLoginFormVisible(true)} className="w-full cursor-pointer rounded-2xl bg-emerald-400 px-4 py-3 font-semibold text-slate-950">Finalizar compra</button>
+              <button onClick={handleClearCart} className="w-full cursor-pointer bg-transparent px-0 py-0 text-center text-sm font-semibold text-slate-300 transition hover:text-white">Limpar carrinho</button>
+            </>
           </div>
         ) : null}
       </aside>
+
+      {/* Centered modal for login details (separate from the sidebar) */}
+      {loginFormVisible && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/60" onClick={() => setLoginFormVisible(false)} />
+          <div className="relative z-[90] w-full max-w-3xl rounded-lg bg-slate-950 p-6 shadow-lg">
+            <h3 className="text-lg font-semibold text-white">Informações da conta para o serviço</h3>
+            <p className="mt-1 text-sm text-slate-400">Forneça as informações necessárias para que possamos iniciar o serviço.</p>
+
+            <div className="mt-4 space-y-3">
+              <div>
+                <label className="text-xs text-slate-300">Versão do jogo</label>
+                <div className="mt-2 flex gap-2">
+                  <button
+                    type="button"
+                    aria-pressed={loginDetails.version === "legacy"}
+                    onClick={() => setLoginDetails((s) => ({ ...s, version: "legacy" }))}
+                    className={`rounded-full px-4 py-2 text-sm font-medium transition cursor-pointer ${loginDetails.version === "legacy" ? "bg-cyan-400 text-slate-950" : "bg-white/5 text-white"}`}
+                  >
+                    Legacy
+                  </button>
+                  <button
+                    type="button"
+                    aria-pressed={loginDetails.version === "enhanced"}
+                    onClick={() => setLoginDetails((s) => ({ ...s, version: "enhanced" }))}
+                    className={`rounded-full px-4 py-2 text-sm font-medium transition cursor-pointer ${loginDetails.version === "enhanced" ? "bg-cyan-400 text-slate-950" : "bg-white/5 text-white"}`}
+                  >
+                    Enhanced
+                  </button>
+                </div>
+              </div>
+
+
+              <div>
+                <label className="text-xs text-slate-300">Onde você joga</label>
+                <div className="mt-2 grid grid-cols-4 gap-2">
+                  <button
+                    type="button"
+                    aria-pressed={loginDetails.store === "steam"}
+                    onClick={() => setLoginDetails((s) => ({ ...s, store: "steam" }))}
+                    className={`w-full rounded-md px-3 py-2 text-sm font-medium cursor-pointer ${loginDetails.store === "steam" ? "bg-cyan-400 text-slate-950" : "bg-white/5 text-white"}`}
+                  >
+                    <span className="flex items-center justify-center gap-2">
+                      <FaSteam className="h-4 w-4" />
+                      <span>Steam</span>
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    aria-pressed={loginDetails.store === "epic"}
+                    onClick={() => setLoginDetails((s) => ({ ...s, store: "epic" }))}
+                    className={`w-full rounded-md px-3 py-2 text-sm font-medium cursor-pointer ${loginDetails.store === "epic" ? "bg-cyan-400 text-slate-950" : "bg-white/5 text-white"}`}
+                  >
+                    <span className="flex items-center justify-center gap-2">
+                      <FaGamepad className="h-4 w-4" />
+                      <span>Epic Games</span>
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    aria-pressed={loginDetails.store === "xboxpass"}
+                    onClick={() => setLoginDetails((s) => ({ ...s, store: "xboxpass" }))}
+                    className={`w-full rounded-md px-3 py-2 text-sm font-medium cursor-pointer ${loginDetails.store === "xboxpass" ? "bg-cyan-400 text-slate-950" : "bg-white/5 text-white"}`}
+                  >
+                    <span className="flex items-center justify-center gap-2">
+                      <FaXbox className="h-4 w-4" />
+                      <span>Game Pass</span>
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    aria-pressed={loginDetails.store === "rockstar"}
+                    onClick={() => setLoginDetails((s) => ({ ...s, store: "rockstar" }))}
+                    className={`w-full rounded-md px-3 py-2 text-sm font-medium cursor-pointer ${loginDetails.store === "rockstar" ? "bg-cyan-400 text-slate-950" : "bg-white/5 text-white"}`}
+                  >
+                    <span className="flex items-center justify-center gap-2">
+                      <SiRockstargames className="h-4 w-4" />
+                      <span>Rockstar</span>
+                    </span>
+                  </button>
+                </div>
+              </div>
+
+              {/* store-specific credentials */}
+              <div>
+                {loginDetails.store === "rockstar" ? (
+                  <>
+                    <label className="text-xs text-slate-300">Email Rockstar</label>
+                    <input value={loginDetails.rockstarEmail} onChange={(e) => setLoginDetails((s) => ({ ...s, rockstarEmail: e.target.value }))} className="mt-1 w-full rounded-md bg-white/5 px-3 py-2 text-sm text-white" />
+                    <label className="mt-2 text-xs text-slate-300">Senha Rockstar</label>
+                    <input type="password" value={loginDetails.rockstarPassword} onChange={(e) => setLoginDetails((s) => ({ ...s, rockstarPassword: e.target.value }))} className="mt-1 w-full rounded-md bg-white/5 px-3 py-2 text-sm text-white" />
+                  </>
+                ) : (
+                  <>
+                    <label className="text-xs text-slate-300">Conta (usuário ou email) - {loginDetails.store}</label>
+                    <input value={loginDetails.storeAccount} onChange={(e) => setLoginDetails((s) => ({ ...s, storeAccount: e.target.value }))} className="mt-1 w-full rounded-md bg-white/5 px-3 py-2 text-sm text-white" />
+                    <label className="mt-2 text-xs text-slate-300">Senha da conta</label>
+                    <input type="password" value={loginDetails.storePassword} onChange={(e) => setLoginDetails((s) => ({ ...s, storePassword: e.target.value }))} className="mt-1 w-full rounded-md bg-white/5 px-3 py-2 text-sm text-white" />
+
+                    <div className="mt-3">
+                      <label className="text-xs text-slate-300">Email Rockstar (necessário para este método)</label>
+                      <input value={loginDetails.rockstarEmail} onChange={(e) => setLoginDetails((s) => ({ ...s, rockstarEmail: e.target.value }))} className="mt-1 w-full rounded-md bg-white/5 px-3 py-2 text-sm text-white" />
+                      <label className="mt-2 text-xs text-slate-300">Senha Rockstar</label>
+                      <input type="password" value={loginDetails.rockstarPassword} onChange={(e) => setLoginDetails((s) => ({ ...s, rockstarPassword: e.target.value }))} className="mt-1 w-full rounded-md bg-white/5 px-3 py-2 text-sm text-white" />
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* generic account/password fields removed per request */}
+
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    setLoginFormVisible(false);
+                    handleCheckout(loginDetails);
+                  }}
+                  className="flex-1 cursor-pointer rounded-2xl bg-emerald-400 px-4 py-3 font-semibold text-slate-950"
+                >
+                  Confirmar e pagar
+                </button>
+                <button onClick={() => setLoginFormVisible(false)} className="flex-1 cursor-pointer rounded-2xl border border-white/10 px-4 py-3 font-semibold text-white">Cancelar</button>
+              </div>
+
+              <div className="text-xs text-slate-400">Informações de login são enviadas de forma direta ao pedido. Não armazene senhas sensíveis sem criptografia.</div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

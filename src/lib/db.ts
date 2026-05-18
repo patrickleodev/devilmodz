@@ -9,6 +9,8 @@ const legacyTitles: Record<string, string[]> = {
   elite: ["Pacote Elite"],
 };
 
+let maintenancePromise: Promise<void> | null = null;
+
 export const seedDefaultProducts = async (options: { force?: boolean; dataSource?: DataSource } = {}) => {
   const dataSource = options.dataSource || AppDataSource;
   const productRepository = dataSource.getRepository(Product);
@@ -47,112 +49,129 @@ export const seedDefaultProducts = async (options: { force?: boolean; dataSource
   }
 };
 
-export const ensureDataSource = async (options: { seedProducts?: boolean } = {}) => {
+export const ensureDataSource = async (options: { seedProducts?: boolean; skipMaintenance?: boolean } = {}) => {
   if (!AppDataSource.isInitialized) {
     await AppDataSource.initialize();
   }
 
-  const [amountColumn] = (await AppDataSource.query(
-    `
-    SELECT data_type
-    FROM information_schema.columns
-    WHERE table_schema = 'public'
-      AND table_name = 'orders'
-      AND column_name = 'amount'
-    LIMIT 1
-    `
-  )) as Array<{ data_type?: string }>;
+  if (options.skipMaintenance) {
+    if (options.seedProducts) {
+      await seedDefaultProducts({ dataSource: AppDataSource });
+    }
 
-  if (amountColumn?.data_type === "integer" || amountColumn?.data_type === "smallint" || amountColumn?.data_type === "bigint") {
-    await AppDataSource.query(
-      `ALTER TABLE "orders"
-       ALTER COLUMN "amount" TYPE numeric(10,2)
-       USING "amount"::numeric(10,2)`
-    );
+    return AppDataSource;
   }
 
-  const [priceColumn] = (await AppDataSource.query(
-    `
-    SELECT data_type
-    FROM information_schema.columns
-    WHERE table_schema = 'public'
-      AND table_name = 'products'
-      AND column_name = 'price'
-    LIMIT 1
-    `
-  )) as Array<{ data_type?: string }>;
+  if (!maintenancePromise) {
+    maintenancePromise = (async () => {
+      const [amountColumn] = (await AppDataSource.query(
+        `
+        SELECT data_type
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'orders'
+          AND column_name = 'amount'
+        LIMIT 1
+        `
+      )) as Array<{ data_type?: string }>;
 
-  if (priceColumn?.data_type === "integer" || priceColumn?.data_type === "smallint" || priceColumn?.data_type === "bigint") {
-    await AppDataSource.query(
-      `ALTER TABLE "products"
-       ALTER COLUMN "price" TYPE numeric(10,2)
-       USING "price"::numeric(10,2)`
-    );
+      if (amountColumn?.data_type === "integer" || amountColumn?.data_type === "smallint" || amountColumn?.data_type === "bigint") {
+        await AppDataSource.query(
+          `ALTER TABLE "orders"
+           ALTER COLUMN "amount" TYPE numeric(10,2)
+           USING "amount"::numeric(10,2)`
+        );
+      }
+
+      const [priceColumn] = (await AppDataSource.query(
+        `
+        SELECT data_type
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'products'
+          AND column_name = 'price'
+        LIMIT 1
+        `
+      )) as Array<{ data_type?: string }>;
+
+      if (priceColumn?.data_type === "integer" || priceColumn?.data_type === "smallint" || priceColumn?.data_type === "bigint") {
+        await AppDataSource.query(
+          `ALTER TABLE "products"
+           ALTER COLUMN "price" TYPE numeric(10,2)
+           USING "price"::numeric(10,2)`
+        );
+      }
+
+      await AppDataSource.query(`ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "productTitle" text`);
+      await AppDataSource.query(`ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "productDescription" text`);
+      await AppDataSource.query(`ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "productDeliveryType" text`);
+      await AppDataSource.query(`ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "productTags" text`);
+      await AppDataSource.query(`ALTER TABLE "orders" ALTER COLUMN "productId" DROP NOT NULL`);
+      await AppDataSource.query(`ALTER TABLE "cart_items" ALTER COLUMN "productId" DROP NOT NULL`);
+      await AppDataSource.query(`ALTER TABLE "cart_items" ADD COLUMN IF NOT EXISTS "itemTitle" text`);
+      await AppDataSource.query(`ALTER TABLE "cart_items" ADD COLUMN IF NOT EXISTS "itemDescription" text`);
+      await AppDataSource.query(`ALTER TABLE "cart_items" ADD COLUMN IF NOT EXISTS "itemPrice" numeric(10,2)`);
+      await AppDataSource.query(`ALTER TABLE "cart_items" ADD COLUMN IF NOT EXISTS "itemDeliveryType" text`);
+      await AppDataSource.query(`ALTER TABLE "cart_items" ADD COLUMN IF NOT EXISTS "itemTags" text`);
+      await AppDataSource.query(
+        `UPDATE "orders" o
+         SET
+           "productTitle" = COALESCE(o."productTitle", p."title"),
+           "productDescription" = COALESCE(o."productDescription", p."description"),
+           "productDeliveryType" = COALESCE(o."productDeliveryType", p."deliveryType"),
+           "productTags" = COALESCE(o."productTags", p."tags")
+         FROM "products" p
+         WHERE o."productId" = p."id"
+           AND (
+             o."productTitle" IS NULL
+             OR o."productDescription" IS NULL
+             OR o."productDeliveryType" IS NULL
+             OR o."productTags" IS NULL
+           )`
+      );
+      await AppDataSource.query(
+        `UPDATE "cart_items" c
+         SET
+           "itemTitle" = COALESCE(c."itemTitle", p."title"),
+           "itemDescription" = COALESCE(c."itemDescription", p."description"),
+           "itemPrice" = COALESCE(c."itemPrice", p."price"),
+           "itemDeliveryType" = COALESCE(c."itemDeliveryType", p."deliveryType"),
+           "itemTags" = COALESCE(c."itemTags", p."tags"),
+           "productId" = NULL
+         FROM "products" p
+         WHERE c."productId" = p."id"
+           AND string_to_array(COALESCE(p."tags", ''), ',') @> ARRAY['custom:plan']`
+      );
+      await AppDataSource.query(
+        `UPDATE "orders" o
+         SET "productId" = NULL
+         FROM "products" p
+         WHERE o."productId" = p."id"
+           AND string_to_array(COALESCE(p."tags", ''), ',') @> ARRAY['custom:plan']`
+      );
+      await AppDataSource.query(
+        `UPDATE "orders" o
+         SET "productTitle" = COALESCE(
+           NULLIF(o."productTitle", ''),
+           NULLIF(pay."rawPayload" #>> '{request,items,0,description}', ''),
+           NULLIF(pay."rawPayload" #>> '{items,0,description}', '')
+         )
+         FROM "payments" pay
+         WHERE pay."orderId" = o."id"
+           AND pay."rawPayload" IS NOT NULL
+           AND (o."productTitle" IS NULL OR o."productTitle" = '')
+           AND (
+             NULLIF(pay."rawPayload" #>> '{request,items,0,description}', '') IS NOT NULL
+             OR NULLIF(pay."rawPayload" #>> '{items,0,description}', '') IS NOT NULL
+           )`
+      );
+    })().catch((error) => {
+      maintenancePromise = null;
+      throw error;
+    });
   }
 
-  await AppDataSource.query(`ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "productTitle" text`);
-  await AppDataSource.query(`ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "productDescription" text`);
-  await AppDataSource.query(`ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "productDeliveryType" text`);
-  await AppDataSource.query(`ALTER TABLE "orders" ADD COLUMN IF NOT EXISTS "productTags" text`);
-  await AppDataSource.query(`ALTER TABLE "orders" ALTER COLUMN "productId" DROP NOT NULL`);
-  await AppDataSource.query(`ALTER TABLE "cart_items" ALTER COLUMN "productId" DROP NOT NULL`);
-  await AppDataSource.query(`ALTER TABLE "cart_items" ADD COLUMN IF NOT EXISTS "itemTitle" text`);
-  await AppDataSource.query(`ALTER TABLE "cart_items" ADD COLUMN IF NOT EXISTS "itemDescription" text`);
-  await AppDataSource.query(`ALTER TABLE "cart_items" ADD COLUMN IF NOT EXISTS "itemPrice" numeric(10,2)`);
-  await AppDataSource.query(`ALTER TABLE "cart_items" ADD COLUMN IF NOT EXISTS "itemDeliveryType" text`);
-  await AppDataSource.query(`ALTER TABLE "cart_items" ADD COLUMN IF NOT EXISTS "itemTags" text`);
-  await AppDataSource.query(
-    `UPDATE "orders" o
-     SET
-       "productTitle" = COALESCE(o."productTitle", p."title"),
-       "productDescription" = COALESCE(o."productDescription", p."description"),
-       "productDeliveryType" = COALESCE(o."productDeliveryType", p."deliveryType"),
-       "productTags" = COALESCE(o."productTags", p."tags")
-     FROM "products" p
-     WHERE o."productId" = p."id"
-       AND (
-         o."productTitle" IS NULL
-         OR o."productDescription" IS NULL
-         OR o."productDeliveryType" IS NULL
-         OR o."productTags" IS NULL
-       )`
-  );
-  await AppDataSource.query(
-    `UPDATE "cart_items" c
-     SET
-       "itemTitle" = COALESCE(c."itemTitle", p."title"),
-       "itemDescription" = COALESCE(c."itemDescription", p."description"),
-       "itemPrice" = COALESCE(c."itemPrice", p."price"),
-       "itemDeliveryType" = COALESCE(c."itemDeliveryType", p."deliveryType"),
-       "itemTags" = COALESCE(c."itemTags", p."tags"),
-       "productId" = NULL
-     FROM "products" p
-     WHERE c."productId" = p."id"
-       AND string_to_array(COALESCE(p."tags", ''), ',') @> ARRAY['custom:plan']`
-  );
-  await AppDataSource.query(
-    `UPDATE "orders" o
-     SET "productId" = NULL
-     FROM "products" p
-     WHERE o."productId" = p."id"
-       AND string_to_array(COALESCE(p."tags", ''), ',') @> ARRAY['custom:plan']`
-  );
-  await AppDataSource.query(
-    `UPDATE "orders" o
-     SET "productTitle" = COALESCE(
-       NULLIF(o."productTitle", ''),
-       NULLIF(pay."rawPayload" #>> '{request,items,0,description}', ''),
-       NULLIF(pay."rawPayload" #>> '{items,0,description}', '')
-     )
-     FROM "payments" pay
-     WHERE pay."orderId" = o."id"
-       AND pay."rawPayload" IS NOT NULL
-       AND (o."productTitle" IS NULL OR o."productTitle" = '')
-       AND (
-         NULLIF(pay."rawPayload" #>> '{request,items,0,description}', '') IS NOT NULL
-         OR NULLIF(pay."rawPayload" #>> '{items,0,description}', '') IS NOT NULL
-       )`
-  );
+  await maintenancePromise;
 
   if (options.seedProducts) {
     await seedDefaultProducts({ dataSource: AppDataSource });

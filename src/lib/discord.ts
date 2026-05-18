@@ -31,6 +31,9 @@ type DiscordOverwrite = {
 
 let cachedBotUserId: string | null = null;
 
+const channelExistenceCache = new Map<string, { value: boolean | null; expiresAt: number }>();
+const CHANNEL_EXISTENCE_TTL_MS = 5 * 60 * 1000;
+
 const getBotUserId = async (): Promise<string> => {
   if (cachedBotUserId) {
     return cachedBotUserId;
@@ -655,12 +658,19 @@ export const closeTicketAndGetTranscript = async (threadId?: string | null) => {
 export const doesDiscordChannelExist = async (channelId?: string | null): Promise<boolean | null> => {
   if (!channelId) return false;
 
+  const cached = channelExistenceCache.get(channelId);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.value;
+  }
+
   try {
     await createRestClient().get(Routes.channel(channelId));
+    channelExistenceCache.set(channelId, { value: true, expiresAt: Date.now() + CHANNEL_EXISTENCE_TTL_MS });
     return true;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     if (message.includes("Unknown Channel") || message.includes("10003")) {
+      channelExistenceCache.set(channelId, { value: false, expiresAt: Date.now() + CHANNEL_EXISTENCE_TTL_MS });
       return false;
     }
 

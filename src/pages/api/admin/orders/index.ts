@@ -53,15 +53,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     [key: string]: unknown;
   }>;
 
+  const staleChecks = await Promise.all(
+    orders.map(async (order) => {
+      if (!order.discordThreadId) {
+        return { order, isStale: false };
+      }
+
+      const exists = await doesDiscordChannelExist(order.discordThreadId);
+      return { order, isStale: exists === false };
+    })
+  );
+
   const staleOrderIds: string[] = [];
-  for (const order of orders) {
-    if (!order.discordThreadId) continue;
-    const exists = await doesDiscordChannelExist(order.discordThreadId);
-    if (exists === false) {
-      staleOrderIds.push(order.id);
-      order.discordThreadId = null;
-      order.discordThreadUrl = null;
-    }
+  for (const check of staleChecks) {
+    if (!check.isStale) continue;
+    staleOrderIds.push(check.order.id);
+    check.order.discordThreadId = null;
+    check.order.discordThreadUrl = null;
   }
 
   if (staleOrderIds.length > 0) {
