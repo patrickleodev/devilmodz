@@ -190,9 +190,11 @@ export default function Header() {
             >
               <span className="relative inline-flex">
                 🛒
-                <span className={`absolute -right-2 -top-2 inline-flex min-w-[1.3rem] items-center justify-center rounded-full bg-emerald-400 px-1.5 text-[0.65rem] font-semibold text-slate-950 shadow-[0_0_0_4px_rgba(16,185,129,0.15)] ${cartNotify ? "animate-cart-notification" : ""}`}>
-                  {cartCount}
-                </span>
+                {cartCount > 0 && (
+                  <span className={`absolute -right-2 -top-2 inline-flex min-w-[1.3rem] items-center justify-center rounded-full bg-emerald-400 px-1.5 text-[0.65rem] font-semibold text-slate-950 shadow-[0_0_0_4px_rgba(16,185,129,0.15)] ${cartNotify ? "animate-cart-notification" : ""}`}>
+                    {cartCount}
+                  </span>
+                )}
               </span>
             </button>
 
@@ -362,9 +364,11 @@ export default function Header() {
               >
                 <span className="relative inline-flex">
                   <FiShoppingCart className="h-4 w-4" aria-hidden="true" />
-                  <span className={`absolute -right-2 -top-2 inline-flex min-w-[1.3rem] items-center justify-center rounded-full bg-emerald-400 px-1.5 text-[0.65rem] font-semibold text-slate-950 shadow-[0_0_0_4px_rgba(16,185,129,0.15)] ${cartNotify ? "animate-cart-notification" : ""}`}>
-                    {cartCount}
-                  </span>
+                  {cartCount > 0 && (
+                    <span className={`absolute -right-2 -top-2 inline-flex min-w-[1.3rem] items-center justify-center rounded-full bg-emerald-400 px-1.5 text-[0.65rem] font-semibold text-slate-950 shadow-[0_0_0_4px_rgba(16,185,129,0.15)] ${cartNotify ? "animate-cart-notification" : ""}`}>
+                      {cartCount}
+                    </span>
+                  )}
                 </span>
                 <span>Carrinho</span>
               </button>

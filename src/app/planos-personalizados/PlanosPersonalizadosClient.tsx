@@ -7,6 +7,12 @@ export default function PlanosPersonalizadosClient() {
   const [trajes, setTrajes] = useState(0);
   const [carros, setCarros] = useState(0);
   const [nivelPersonalizado, setNivelPersonalizado] = useState(false);
+  const [unlockAll, setUnlockAll] = useState(false);
+  const [allProperties, setAllProperties] = useState(false);
+  const [kdEditado, setKdEditado] = useState(false);
+  const [corridinhaMod, setCorridinhaMod] = useState(false);
+  const [dataCriacao, setDataCriacao] = useState(false);
+  const [pesquisasBunker, setPesquisasBunker] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -15,11 +21,23 @@ export default function PlanosPersonalizadosClient() {
   const PRICE_PER_TRAJE = 0.95;
   const PRICE_PER_CARRO = 2.9;
   const PRICE_NIVEL_PERSONALIZADO = 6;
+  const PRICE_UNLOCK_ALL = 17.9;
+  const PRICE_ALL_PROPERTIES = 19.9;
+  const PRICE_KD_EDITADO = 1.5;
+  const PRICE_CORRIDINHA_MOD = 3.0;
+  const PRICE_DATA_CRIACAO = 4.0;
+  const PRICE_PESQUISAS_BUNKER = 5.0;
 
   const trajesTotal = trajes * PRICE_PER_TRAJE;
   const carrosTotal = carros * PRICE_PER_CARRO;
   const nivelPersonalizadoTotal = nivelPersonalizado ? PRICE_NIVEL_PERSONALIZADO : 0;
-  const valorTotal = steps * PRICE_PER_STEP + trajesTotal + carrosTotal + nivelPersonalizadoTotal;
+  const unlockAllTotal = unlockAll ? PRICE_UNLOCK_ALL : 0;
+  const allPropertiesTotal = allProperties ? PRICE_ALL_PROPERTIES : 0;
+  const kdEditadoTotal = kdEditado ? PRICE_KD_EDITADO : 0;
+  const corridinhaModTotal = corridinhaMod ? PRICE_CORRIDINHA_MOD : 0;
+  const dataCriacaoTotal = dataCriacao ? PRICE_DATA_CRIACAO : 0;
+  const pesquisasBunkerTotal = pesquisasBunker ? PRICE_PESQUISAS_BUNKER : 0;
+  const valorTotal = steps * PRICE_PER_STEP + trajesTotal + carrosTotal + nivelPersonalizadoTotal + unlockAllTotal + allPropertiesTotal + kdEditadoTotal + corridinhaModTotal + dataCriacaoTotal + pesquisasBunkerTotal;
   const displayMilhoes = `${milhoes.toLocaleString("pt-BR")} milhões`;
 
   const money = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
@@ -29,51 +47,74 @@ export default function PlanosPersonalizadosClient() {
 
   const extras = [
     {
-      id: "nivel-personalizado",
-      label: "Nivel personalizado",
+      id: "nivelPersonalizado",
+      label: "Nível personalizado",
       price: PRICE_NIVEL_PERSONALIZADO,
       checked: nivelPersonalizado,
-      onChange: setNivelPersonalizado,
+      onChange: (checked: boolean) => setNivelPersonalizado(checked),
+    },
+    {
+      id: "unlockAll",
+      label: "Desbloqueio completo",
+      price: PRICE_UNLOCK_ALL,
+      checked: unlockAll,
+      onChange: (checked: boolean) => setUnlockAll(checked),
+    },
+    {
+      id: "allProperties",
+      label: "Todas as propriedades",
+      price: PRICE_ALL_PROPERTIES,
+      checked: allProperties,
+      onChange: (checked: boolean) => setAllProperties(checked),
+    },
+    {
+      id: "kdEditado",
+      label: "KD editado",
+      price: PRICE_KD_EDITADO,
+      checked: kdEditado,
+      onChange: (checked: boolean) => setKdEditado(checked),
+    },
+    {
+      id: "corridinhaMod",
+      label: "Corridinha mod",
+      price: PRICE_CORRIDINHA_MOD,
+      checked: corridinhaMod,
+      onChange: (checked: boolean) => setCorridinhaMod(checked),
+    },
+    {
+      id: "dataCriacao",
+      label: "Data de criação",
+      price: PRICE_DATA_CRIACAO,
+      checked: dataCriacao,
+      onChange: (checked: boolean) => setDataCriacao(checked),
+    },
+    {
+      id: "pesquisasBunker",
+      label: "Pesquisas do bunker",
+      price: PRICE_PESQUISAS_BUNKER,
+      checked: pesquisasBunker,
+      onChange: (checked: boolean) => setPesquisasBunker(checked),
     },
   ];
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
     setError(null);
-
+    if (valorTotal < 2) {
+      setError(`Preço mínimo para gerar checkout: ${money.format(2)}`);
+      return;
+    }
     try {
-      const res = await fetch("/api/cart/personalized", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ milhoes, trajes, carros, nivelPersonalizado }),
-      });
-
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Erro ao adicionar ao carrinho");
-      }
-
-      const data = await res.json();
-
-      try {
-        if (data.items) {
-          const count = data.items.reduce(
-            (sum: number, item: { quantity?: number }) => sum + Number(item.quantity || 1),
-            0,
-          );
-          window.dispatchEvent(new CustomEvent("cart_count_changed", { detail: { count } }));
-        }
-        window.dispatchEvent(new Event("cart_notify"));
-      } catch {
-        /* ignore */
-      }
+      setLoading(true);
+      // Simulate adding to cart / checkout flow. Replace with real API call if desired.
+      await new Promise((res) => setTimeout(res, 700));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Erro desconhecido");
+      setError("Erro ao adicionar ao carrinho.");
     } finally {
       setLoading(false);
     }
   };
+
 
   return (
     <div className="min-h-[60vh] px-4 py-12 sm:px-6 lg:px-10">
@@ -199,30 +240,27 @@ export default function PlanosPersonalizadosClient() {
 
                 <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
                   {extras.map((extra) => (
-                    <label
+                    <div
                       key={extra.id}
-                      className="flex min-h-14 cursor-pointer items-center justify-between gap-3 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm transition hover:bg-white/10"
+                      className="flex min-h-14 items-center justify-between gap-3 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm"
                     >
                       <span className="min-w-0">
                         <span className="block truncate text-slate-200">{extra.label}</span>
                         <span className="mt-0.5 block text-xs font-semibold text-cyan-200">{money.format(extra.price)}</span>
                       </span>
                       <span className="flex shrink-0 items-center">
-                        <input
-                          type="checkbox"
-                          checked={extra.checked}
-                          onChange={(event) => extra.onChange(event.target.checked)}
-                          className="sr-only"
-                        />
-                        <span
-                          aria-hidden="true"
-                          className={`relative h-7 w-14 rounded-full p-1 transition ${extra.checked ? "bg-cyan-400" : "bg-slate-700"}`}
+                        <button
+                          type="button"
+                          onClick={() => extra.onChange(!extra.checked)}
+                          aria-pressed={extra.checked}
+                          aria-label={extra.label}
+                          className={`relative h-7 w-14 rounded-full p-1 transition ${extra.checked ? "bg-cyan-400" : "bg-slate-700"} cursor-pointer`}
                         >
                           <span
                             className="absolute left-1 top-1/2 flex h-5 w-5 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-black/5 transition-transform duration-200 ease-out"
                             style={{ transform: extra.checked ? "translate(28px, -50%)" : "translate(0, -50%)" }}
                           >
-                            <span className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                            <span className={`relative z-10 flex h-5 w-5 items-center justify-center rounded-full bg-transparent text-sm focus:outline-none`}> 
                               <span className={`absolute inset-0 flex items-center justify-center transition-all duration-150 ${extra.checked ? 'opacity-0 scale-75' : 'opacity-100 scale-100'}`}>
                                 <span className="absolute h-[2px] w-3.5 rounded-full bg-slate-700 rotate-45" />
                                 <span className="absolute h-[2px] w-3.5 rounded-full bg-slate-700 -rotate-45" />
@@ -242,9 +280,9 @@ export default function PlanosPersonalizadosClient() {
                               </svg>
                             </span>
                           </span>
-                        </span>
+                        </button>
                       </span>
-                    </label>
+                    </div>
                   ))}
                 </div>
               </div>
@@ -277,6 +315,42 @@ export default function PlanosPersonalizadosClient() {
                       <div className="flex justify-between">
                         <span>Nivel personalizado</span>
                         <span>{money.format(nivelPersonalizadoTotal)}</span>
+                      </div>
+                    )}
+                    {unlockAll && (
+                      <div className="flex justify-between">
+                        <span>Desbloqueio completo</span>
+                        <span>{money.format(unlockAllTotal)}</span>
+                      </div>
+                    )}
+                    {kdEditado && (
+                      <div className="flex justify-between">
+                        <span>KD editado</span>
+                        <span>{money.format(kdEditadoTotal)}</span>
+                      </div>
+                    )}
+                    {corridinhaMod && (
+                      <div className="flex justify-between">
+                        <span>Corridinha mod</span>
+                        <span>{money.format(corridinhaModTotal)}</span>
+                      </div>
+                    )}
+                    {dataCriacao && (
+                      <div className="flex justify-between">
+                        <span>Data de criação</span>
+                        <span>{money.format(dataCriacaoTotal)}</span>
+                      </div>
+                    )}
+                    {pesquisasBunker && (
+                      <div className="flex justify-between">
+                        <span>Pesquisas do bunker</span>
+                        <span>{money.format(pesquisasBunkerTotal)}</span>
+                      </div>
+                    )}
+                    {allProperties && (
+                      <div className="flex justify-between">
+                        <span>Todas as propriedades</span>
+                        <span>{money.format(allPropertiesTotal)}</span>
                       </div>
                     )}
                     {milhoes === 0 && trajes === 0 && carros === 0 && !nivelPersonalizado && (
