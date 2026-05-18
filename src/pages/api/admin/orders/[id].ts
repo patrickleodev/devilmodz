@@ -23,6 +23,37 @@ type TicketOrderDetails = {
   productTitle?: string | null;
 };
 
+const readStringValue = (value: unknown): string | null => {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+};
+
+const looksLikeCheckoutUrl = (value: string) => {
+  const lower = value.toLowerCase();
+  return lower.startsWith("http://") || lower.startsWith("https://") || lower.includes("checkout.infinitepay.io");
+};
+
+const resolveRefundTransactionId = (payment: Payment): string | null => {
+  const raw = (payment.rawPayload || {}) as Record<string, unknown>;
+  const candidates: Array<string | null> = [
+    readStringValue(raw.transactionId),
+    readStringValue(raw.transaction_id),
+    readStringValue(raw.transaction_nsu),
+    readStringValue(raw.id),
+    readStringValue((raw.data as Record<string, unknown> | undefined)?.id),
+    readStringValue(payment.providerPaymentId),
+  ];
+
+  for (const candidate of candidates) {
+    if (!candidate) continue;
+    if (looksLikeCheckoutUrl(candidate)) continue;
+    return candidate;
+  }
+
+  return null;
+};
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     const session = await getServerSession(req, res, authOptions);
@@ -51,20 +82,42 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (req.method === "PATCH") {
       const { status, action } = req.body as { status?: string; action?: string };
 
-    if (action === "refund") {
-      const payment = await paymentRepository.findOneBy({ orderId: order.id, provider: "infinitepay" });
+      if (action === "refund") {
+        const payment = await paymentRepository.findOneBy({ orderId: order.id, provider: "infinitepay" });
 
-      if (!payment?.providerPaymentId) {
-        return res.status(400).json({ error: "Payment not found for refund" });
+        if (!payment) {
+          return res.status(400).json({ error: "Payment not found for refund" });
+        }
+
+        const transactionId = resolveRefundTransactionId(payment);
+        if (!transactionId) {
+          return res.status(400).json({
+            error:
+              "Nao foi possivel identificar o transactionId da InfinitePay para reembolso automatico. Atualize o pagamento via webhook ou faça o reembolso manual no painel da InfinitePay.",
+          });
+        }
+
+        try {
+          await refundInfinitePayTransaction(transactionId);
+        } catch (refundErr) {
+          const message = refundErr instanceof Error ? refundErr.message : String(refundErr);
+          if (message.toLowerCase().includes("fetch failed")) {
+            return res.status(400).json({
+              error:
+                "A InfinitePay nao disponibilizou o reembolso automatico pela API para esta venda. Cancele a venda no App/Web InfinitePay e, depois de confirmado, altere o status do pedido para refunded no seletor.",
+            });
+          }
+
+          return res.status(502).json({ error: `Falha ao solicitar reembolso na InfinitePay: ${message}` });
+        }
+
+        order.status = "refunded";
+        payment.status = "refunded";
+        payment.providerPaymentId = transactionId;
+        await paymentRepository.save(payment);
+        const updatedOrder = await orderRepository.save(order);
+        return res.status(200).json({ order: updatedOrder });
       }
-
-      await refundInfinitePayTransaction(payment.providerPaymentId);
-      order.status = "refunded";
-      payment.status = "refunded";
-      await paymentRepository.save(payment);
-      const updatedOrder = await orderRepository.save(order);
-      return res.status(200).json({ order: updatedOrder });
-    }
 
     if (action === "deliver") {
       order.status = "delivered";

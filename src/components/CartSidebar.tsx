@@ -10,6 +10,7 @@ export default function CartSidebar({ open, onClose }: { open: boolean; onClose:
   const [items, setItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const money = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 
   const fetchCart = async () => {
     setLoading(true);
@@ -93,7 +94,10 @@ export default function CartSidebar({ open, onClose }: { open: boolean; onClose:
                 <div key={it.id} className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 p-3">
                   <div className="min-w-0 pr-3">
                     <div className="truncate font-medium">{it.product?.title || it.productId}</div>
-                    <div className="text-sm text-slate-400">Quantidade: {it.quantity}</div>
+                    <div className="text-sm text-slate-400">
+                      Quantidade: {it.quantity} - {money.format(Number(it.product?.price || 0))}
+                      {Number(it.quantity || 1) > 1 ? ` cada - Total ${money.format(Number(it.product?.price || 0) * Number(it.quantity || 1))}` : ""}
+                    </div>
                   </div>
                   <button
                     onClick={() => handleRemove(it.id)}

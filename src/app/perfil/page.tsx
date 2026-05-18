@@ -400,7 +400,7 @@ export default function AccountPage() {
                                           : [...current, order.id]
                                       )
                                     }
-                                    className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-cyan-400 to-emerald-400 px-4 py-2.5 text-sm font-semibold text-slate-950 transition hover:brightness-110 sm:w-auto"
+                                    className="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-cyan-400 to-emerald-400 px-4 py-2.5 text-sm font-semibold text-slate-950 transition hover:brightness-110 sm:w-auto"
                                   >
                                     <span>{isExpanded ? "Ocultar detalhes" : "Ver detalhes"}</span>
                                     <svg aria-hidden="true" className="h-4 w-4 fill-none stroke-current stroke-[2]" viewBox="0 0 20 20">
